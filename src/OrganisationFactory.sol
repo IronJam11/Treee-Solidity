@@ -27,13 +27,9 @@ contract OrganisationFactory is Ownable {
         external
         returns (uint256 organisationId, address organisationAddress)
     {
-        // This function allows a user to create a new organization.
-
         if (bytes(_name).length == 0) revert InvalidNameInput();
         if (bytes(_description).length == 0) revert InvalidDescriptionInput();
         organisationId = s_organisationCounter;
-
-        // Deploy new Organization contract
         Organisation newOrganisation = new Organisation(
             organisationId, _name, _description, _photoIpfsHash, msg.sender, address(this), treeNFTContract, msg.sender
         );
