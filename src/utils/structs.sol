@@ -43,6 +43,19 @@ struct User {
     uint256 reportedSpam;
 }
 
+struct UserDetails {
+    address userAddress;
+    string profilePhotoIpfs;
+    string name;
+    uint256 dateJoined;
+    uint256 verificationsRevoked;
+    uint256 reportedSpam;
+    uint256 verifierTokens;
+    uint256 planterTokens;
+    uint256 legacyTokens;
+    uint256 careTokens;
+}
+
 struct Tree {
     uint256 latitude;
     uint256 longitude;
@@ -51,6 +64,7 @@ struct Tree {
     string species;
     string imageUri;
     string qrIpfsHash;
+    string metadata;
     string[] photos;
     string geoHash;
     address[] ancestors;
@@ -67,5 +81,6 @@ struct TreePlantingProposal {
     string qrIpfsHash;
     string[] photos;
     string geoHash;
+    string metadata;
     uint256 status;
 }

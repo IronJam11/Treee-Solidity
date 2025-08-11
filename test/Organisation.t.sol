@@ -41,6 +41,7 @@ contract OrganisationTest is Test {
     string constant DESCRIPTION2 = "This is a test organisation.";
     string constant PHOTO_IPFS_HASH2 = "QmTestPhotoHash";
     string constant JOIN_REQUEST_DESCRIPTION = "I want to join this organisation";
+    string constant METADATA = "ipfs://metaDataHash";
 
     function setUp() public {
         vm.startPrank(owner);
@@ -158,7 +159,7 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, GEOHASH, imageHashes);
+        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, METADATA, GEOHASH, imageHashes);
         vm.stopPrank();
 
         vm.prank(user2);
@@ -190,7 +191,7 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, GEOHASH, imageHashes);
+        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, METADATA, GEOHASH, imageHashes);
         vm.stopPrank();
 
         vm.prank(user1);
@@ -240,7 +241,7 @@ contract OrganisationTest is Test {
 
         vm.prank(user1);
         Organisation(orgAddress).plantTreeProposal(
-            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, proofHashes, GEOHASH
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, METADATA, proofHashes, GEOHASH
         );
         vm.stopPrank();
 
@@ -270,7 +271,7 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, GEOHASH, imageHashes);
+        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH,  METADATA, GEOHASH, imageHashes);
         vm.stopPrank();
 
         vm.prank(user1);
@@ -293,7 +294,7 @@ contract OrganisationTest is Test {
         string[] memory proofHashes = new string[](1);
         proofHashes[0] = "QmProofHash";
         Organisation(orgAddress).plantTreeProposal(
-            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, proofHashes, GEOHASH
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, METADATA, proofHashes, GEOHASH
         );
         vm.stopPrank();
 

@@ -72,16 +72,17 @@ contract TreeNft is ERC721, Ownable {
         string memory species,
         string memory imageUri,
         string memory qrIpfsHash,
+        string memory metadata,
         string memory geoHash,
         string[] memory initialPhotos
     ) public {
-        // This function mints a new NFT for the user
 
         if (latitude > 180 * 1e6) revert InvalidCoordinates();
         if (longitude > 360 * 1e6) revert InvalidCoordinates();
 
         uint256 tokenId = s_tokenCounter;
         s_tokenCounter++;
+        
         _mint(msg.sender, tokenId);
         address[] memory ancestors = new address[](1);
         ancestors[0] = msg.sender;
@@ -93,6 +94,7 @@ contract TreeNft is ERC721, Ownable {
             species,
             imageUri,
             qrIpfsHash,
+            metadata,
             initialPhotos,
             geoHash,
             ancestors,
@@ -102,6 +104,7 @@ contract TreeNft is ERC721, Ownable {
 
         s_userToNFTs[msg.sender].push(tokenId);
         planterTokenContract.mint(msg.sender, tokenId);
+
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
@@ -362,6 +365,23 @@ contract TreeNft is ERC721, Ownable {
         s_userCounter++;
     }
 
+    function getUserProfile(address userAddress) public view returns (UserDetails memory userDetails) {
+        if (s_addressToUser[userAddress].userAddress == address(0)) revert UserNotRegistered();
+        User memory storedUserDetails = s_addressToUser[userAddress];
+        userDetails.name = storedUserDetails.name;
+        userDetails.dateJoined = storedUserDetails.dateJoined;
+        userDetails.profilePhotoIpfs = storedUserDetails.profilePhotoIpfs;
+        userDetails.userAddress = storedUserDetails.userAddress; 
+        userDetails.reportedSpam = storedUserDetails.reportedSpam; 
+        userDetails.verificationsRevoked = storedUserDetails.verificationsRevoked; 
+        userDetails.careTokens = careTokenContract.balanceOf(userAddress);
+        userDetails.planterTokens = planterTokenContract.balanceOf(userAddress);
+        userDetails.legacyTokens = legacyToken.balanceOf(userAddress);
+        userDetails.verifierTokens = verifierTokenContract.balanceOf(userAddress);
+        return userDetails;
+    }
+
+
     function updateUserDetails(string memory _name, string memory _profilePhotoHash) public {
         // This function enables a user to change his user details
 
@@ -379,4 +399,9 @@ contract TreeNft is ERC721, Ownable {
     function _exists(uint256 tokenId) internal view returns (bool) {
         return tokenId < s_tokenCounter && tokenId >= 0;
     }
+
+    function ping() public pure returns (string memory){
+        return "pong";
+    }
+    
 }

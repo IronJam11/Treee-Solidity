@@ -258,8 +258,10 @@ contract Organisation {
         string memory _species,
         string memory _imageURI,
         string memory _qrIpfshash,
+        string memory _metadata,
         string[] memory photos,
         string memory geoHash
+
     ) public {
         if (_latitude > 180 * 1e6) revert InvalidCoordinates();
         if (_longitude > 360 * 1e6) revert InvalidCoordinates();
@@ -274,6 +276,7 @@ contract Organisation {
             qrIpfsHash: _qrIpfshash,
             photos: photos,
             geoHash: geoHash,
+            metadata: _metadata,
             status: 0
         });
         if (checkOwnership(msg.sender)) {
@@ -286,6 +289,7 @@ contract Organisation {
                     proposal.species,
                     proposal.imageUri,
                     proposal.qrIpfsHash,
+                    proposal.metadata,
                     proposal.geoHash,
                     proposal.photos
                 );
@@ -398,6 +402,7 @@ contract Organisation {
                 proposal.species,
                 proposal.imageUri,
                 proposal.qrIpfsHash,
+                proposal.metadata,
                 proposal.geoHash,
                 proposal.photos
             );
