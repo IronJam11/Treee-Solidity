@@ -261,7 +261,6 @@ contract Organisation {
         string memory _metadata,
         string[] memory photos,
         string memory geoHash
-
     ) public {
         if (_latitude > 180 * 1e6) revert InvalidCoordinates();
         if (_longitude > 360 * 1e6) revert InvalidCoordinates();

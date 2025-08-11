@@ -271,7 +271,7 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH,  METADATA, GEOHASH, imageHashes);
+        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, METADATA, GEOHASH, imageHashes);
         vm.stopPrank();
 
         vm.prank(user1);
