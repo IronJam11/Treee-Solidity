@@ -102,7 +102,7 @@ contract TreeNft is ERC721, Ownable {
         );
 
         s_userToNFTs[msg.sender].push(tokenId);
-        planterTokenContract.mint(msg.sender, tokenId);
+        planterTokenContract.mint(msg.sender, 1);
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
@@ -364,6 +364,8 @@ contract TreeNft is ERC721, Ownable {
     }
 
     function getUserProfile(address userAddress) public view returns (UserDetails memory userDetails) {
+        // This function returns the details of the user
+
         if (s_addressToUser[userAddress].userAddress == address(0)) revert UserNotRegistered();
         User memory storedUserDetails = s_addressToUser[userAddress];
         userDetails.name = storedUserDetails.name;
