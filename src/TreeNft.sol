@@ -86,6 +86,7 @@ contract TreeNft is ERC721, Ownable {
         address[] memory ancestors = new address[](1);
         ancestors[0] = msg.sender;
         s_tokenIDtoTree[tokenId] = Tree(
+            tokenId,
             latitude,
             longitude,
             block.timestamp,

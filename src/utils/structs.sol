@@ -57,6 +57,7 @@ struct UserDetails {
 }
 
 struct Tree {
+    uint256 id;
     uint256 latitude;
     uint256 longitude;
     uint256 planting;
