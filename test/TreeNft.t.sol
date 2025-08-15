@@ -309,7 +309,21 @@ contract TreeNftTest is Test {
         vm.prank(user1);
         vm.expectEmit(true, true, true, false);
         emit TreeNft.VerificationRemoved(0, 0, verifier1);
-        treeNft.removeVerification(0);
+        treeNft.removeVerification(0, verifier1);
+
+        TreeNftVerification[] memory verifications = treeNft.getTreeNftVerifiers(0);
+        assertEq(verifications.length, 0);
+    }
+
+    function test_RemoveVerification2() public {
+        vm.prank(user1);
+        string[] memory initialPhotos = new string[](0);
+        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, METADATA, GEO_HASH, initialPhotos);
+
+        vm.prank(verifier1);
+        string[] memory proofHashes = new string[](1);
+        proofHashes[0] = "proof1";
+        treeNft.verify(0, proofHashes, "Verification");
 
         TreeNftVerification[] memory verifications = treeNft.getTreeNftVerifiers(0);
         assertEq(verifications.length, 1);
@@ -327,7 +341,7 @@ contract TreeNftTest is Test {
 
         vm.prank(user2);
         vm.expectRevert(NotTreeOwner.selector);
-        treeNft.removeVerification(0);
+        treeNft.removeVerification(0, verifier1);
     }
 
     function test_GetVerifiedTreesByUser() public {

@@ -228,16 +228,23 @@ contract TreeNft is ERC721, Ownable {
         }
     }
 
-    function removeVerification(uint256 _verificationId) public {
-        // This function enables the owner of the NFT to remove verifications as he pleases (in case of fraudalent verification spam)
+    function removeVerification(uint256 _tokenId, address verifier) public {
+        // Thsi function facilitates the owner of the tree nft to remove fraudulent verifiers
 
-        TreeNftVerification memory treeNftVerification = s_tokenIDtoTreeNftVerfication[_verificationId];
-        if (msg.sender != ownerOf(treeNftVerification.treeNftId)) revert NotTreeOwner();
-        treeNftVerification.isHidden = true;
-        User memory user = s_addressToUser[treeNftVerification.verifier];
-        user.verificationsRevoked++;
-        s_addressToUser[treeNftVerification.verifier] = user;
-        emit VerificationRemoved(_verificationId, treeNftVerification.treeNftId, treeNftVerification.verifier);
+        if (msg.sender != ownerOf(_tokenId)) revert NotTreeOwner();
+        uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
+        for (uint256 i = 0; i < verificationIds.length; i++) {
+            TreeNftVerification storage treeNftVerification = s_tokenIDtoTreeNftVerfication[verificationIds[i]];
+            if (treeNftVerification.verifier == verifier && !treeNftVerification.isHidden) {
+                treeNftVerification.isHidden = true;
+
+                User storage user = s_addressToUser[verifier];
+                user.verificationsRevoked++;
+
+                emit VerificationRemoved(verificationIds[i], _tokenId, verifier);
+                break;
+            }
+        }
     }
 
     function getVerifiedTreesByUser(address verifier) public view returns (Tree[] memory) {
