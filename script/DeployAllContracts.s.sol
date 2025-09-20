@@ -26,8 +26,6 @@ contract DeployAllContractsAtOnce is Script {
         console.log("============================================\n");
 
         vm.startBroadcast(deployerPrivateKey);
-
-        // STEP 1: Deploy token contracts
         console.log(">> Step 1: Deploying ERC20 Token Contracts...");
 
         CareToken careToken = new CareToken(deployer);
