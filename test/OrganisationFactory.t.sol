@@ -12,15 +12,12 @@ import "../src/TreeNft.sol";
 
 import "../src/token-contracts/CareToken.sol";
 import "../src/token-contracts/PlanterToken.sol";
-import "../src/token-contracts/VerifierToken.sol";
 import "../src/token-contracts/LegacyToken.sol";
 
 contract OrganisationFactoryTest is Test {
     OrganisationFactory private factory;
     TreeNft private treeNft;
     CareToken public careToken;
-    PlanterToken public planterToken;
-    VerifierToken public verifierToken;
     LegacyToken public legacyToken;
 
     address private owner = address(0x1);
@@ -40,27 +37,19 @@ contract OrganisationFactoryTest is Test {
         vm.startPrank(owner);
 
         careToken = new CareToken(owner);
-        planterToken = new PlanterToken(owner);
-        verifierToken = new VerifierToken(owner);
         legacyToken = new LegacyToken(owner);
 
-        treeNft = new TreeNft(address(careToken), address(planterToken), address(verifierToken), address(legacyToken));
+        treeNft = new TreeNft(address(careToken), address(legacyToken));
 
         careToken.transferOwnership(address(treeNft));
-        planterToken.transferOwnership(address(treeNft));
-        verifierToken.transferOwnership(address(treeNft));
         legacyToken.transferOwnership(address(treeNft));
 
         vm.stopPrank();
 
         assertEq(careToken.owner(), address(treeNft));
-        assertEq(planterToken.owner(), address(treeNft));
-        assertEq(verifierToken.owner(), address(treeNft));
         assertEq(legacyToken.owner(), address(treeNft));
 
         assertEq(address(treeNft.careTokenContract()), address(careToken));
-        assertEq(address(treeNft.planterTokenContract()), address(planterToken));
-        assertEq(address(treeNft.verifierTokenContract()), address(verifierToken));
         assertEq(address(treeNft.legacyToken()), address(legacyToken));
 
         vm.startPrank(owner);

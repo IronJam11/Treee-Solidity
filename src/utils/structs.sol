@@ -95,4 +95,5 @@ struct TreePlantingProposal {
     string geoHash;
     string metadata;
     uint256 status;
+    uint256 numberOfTrees;
 }

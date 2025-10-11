@@ -260,7 +260,8 @@ contract Organisation {
         string memory _qrIpfshash,
         string memory _metadata,
         string[] memory photos,
-        string memory geoHash
+        string memory geoHash,
+        uint256 numberOfTrees
     ) public {
         if (_latitude > 180 * 1e6) revert InvalidCoordinates();
         if (_longitude > 360 * 1e6) revert InvalidCoordinates();
@@ -276,7 +277,8 @@ contract Organisation {
             photos: photos,
             geoHash: geoHash,
             metadata: _metadata,
-            status: 0
+            status: 0,
+            numberOfTrees: numberOfTrees
         });
         if (checkOwnership(msg.sender)) {
             s_treeProposalYesVoters[s_treePlantingProposalCounter].push(msg.sender);
@@ -290,7 +292,8 @@ contract Organisation {
                     proposal.qrIpfsHash,
                     proposal.metadata,
                     proposal.geoHash,
-                    proposal.photos
+                    proposal.photos,
+                    proposal.numberOfTrees
                 );
             }
         }
@@ -403,7 +406,8 @@ contract Organisation {
                 proposal.qrIpfsHash,
                 proposal.metadata,
                 proposal.geoHash,
-                proposal.photos
+                proposal.photos,
+                proposal.numberOfTrees
             );
         } else if (s_treeProposalNoVoters[proposalID].length >= requiredVotes) {
             proposal.status = 2;

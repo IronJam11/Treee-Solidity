@@ -5,7 +5,6 @@ import "forge-std/Script.sol";
 import "../src/TreeNft.sol";
 import "../src/token-contracts/CareToken.sol";
 import "../src/token-contracts/PlanterToken.sol";
-import "../src/token-contracts/VerifierToken.sol";
 import "../src/token-contracts/LegacyToken.sol";
 import "../src/OrganisationFactory.sol";
 
@@ -32,30 +31,18 @@ contract DeployAllContractsAtOnce is Script {
         careTokenAddress = address(careToken);
         console.log("  - CareToken deployed at:        ", careTokenAddress);
 
-        PlanterToken planterToken = new PlanterToken(deployer);
-        planterTokenAddress = address(planterToken);
-        console.log("  - PlanterToken deployed at:     ", planterTokenAddress);
-
-        VerifierToken verifierToken = new VerifierToken(deployer);
-        verifierTokenAddress = address(verifierToken);
-        console.log("  - VerifierToken deployed at:    ", verifierTokenAddress);
-
         LegacyToken legacyToken = new LegacyToken(deployer);
         legacyTokenAddress = address(legacyToken);
         console.log("  - LegacyToken deployed at:      ", legacyTokenAddress);
 
         console.log("\n>> Step 2: Deploying TreeNft Contract...");
-        TreeNft treeNft = new TreeNft(careTokenAddress, planterTokenAddress, verifierTokenAddress, legacyTokenAddress);
+        TreeNft treeNft = new TreeNft(careTokenAddress,legacyTokenAddress);
         treeNftAddress = address(treeNft);
         console.log("  - TreeNft deployed at:          ", treeNftAddress);
 
         console.log("\n>> Step 3: Transferring Token Ownership to TreeNft...");
         careToken.transferOwnership(treeNftAddress);
         console.log("  - CareToken ownership transferred.");
-        planterToken.transferOwnership(treeNftAddress);
-        console.log("  - PlanterToken ownership transferred.");
-        verifierToken.transferOwnership(treeNftAddress);
-        console.log("  - VerifierToken ownership transferred.");
         legacyToken.transferOwnership(treeNftAddress);
         console.log("  - LegacyToken ownership transferred.");
 
@@ -68,8 +55,6 @@ contract DeployAllContractsAtOnce is Script {
 
         console.log("\n========== DEPLOYMENT SUMMARY ==========");
         console.log("CareToken Address:         ", careTokenAddress);
-        console.log("PlanterToken Address:      ", planterTokenAddress);
-        console.log("VerifierToken Address:     ", verifierTokenAddress);
         console.log("LegacyToken Address:       ", legacyTokenAddress);
         console.log("TreeNft Address:           ", treeNftAddress);
         console.log("OrganisationFactory:       ", orgFactoryAddress);
@@ -85,12 +70,13 @@ contract DeployAllContractsAtOnce is Script {
         TreeNft treeNft = TreeNft(treeNftAddress);
 
         require(address(treeNft.careTokenContract()) == careTokenAddress, "CareToken address mismatch");
-        require(address(treeNft.planterTokenContract()) == planterTokenAddress, "PlanterToken address mismatch");
-        require(address(treeNft.verifierTokenContract()) == verifierTokenAddress, "VerifierToken address mismatch");
         require(address(treeNft.legacyToken()) == legacyTokenAddress, "LegacyToken address mismatch");
 
         CareToken careToken = CareToken(careTokenAddress);
         require(careToken.owner() == treeNftAddress, "CareToken ownership not transferred");
+
+        CareToken legacyToken = CareToken(legacyTokenAddress);
+        require(legacyToken.owner() == treeNftAddress, "LegacyToken ownership not transferred");
 
         console.log("Deployment verification passed.\n");
     }

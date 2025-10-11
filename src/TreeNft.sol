@@ -15,13 +15,13 @@ import "./OrganisationFactory.sol";
 import "./token-contracts/CareToken.sol";
 import "./token-contracts/LegacyToken.sol";
 import "./token-contracts/PlanterToken.sol";
-import "./token-contracts/VerifierToken.sol";
+
 
 contract TreeNft is ERC721, Ownable {
-    uint256 private s_tokenCounter;
+    uint256 private s_treeTokenCounter;
     uint256 private s_organisationCounter;
     uint256 private s_deathCounter;
-    uint256 private s_treeNftVerification;
+    uint256 private s_treeNftVerificationCounter;
     uint256 private s_userCounter;
 
     uint256 public minimumTimeToMarkTreeDead = 365 days;
@@ -36,7 +36,7 @@ contract TreeNft is ERC721, Ownable {
     mapping(address => address[]) public s_userToVerifierTokenAddresses;
 
     mapping(uint256 => mapping(address => bool)) private s_tokenIDtoUserVerification;
-    mapping(address => uint256[]) private s_verifierToTokenIDs;
+    mapping(address => uint256[]) private s_verifierToTreeTokenIDs;
     mapping(uint256 => TreeNftVerification) private s_tokenIDtoTreeNftVerfication;
     mapping(uint256 => uint256[]) private s_treeTokenIdToVerifications;
     mapping(address => TreeNftVerification[]) private s_userToVerifications;
@@ -48,10 +48,10 @@ contract TreeNft is ERC721, Ownable {
         address _legacyTokenContract
     ) Ownable(msg.sender) ERC721("TreeNFT", "TREE") {
 
-        s_tokenCounter = 0;
+        s_treeTokenCounter = 0;
         s_organisationCounter = 0;
         s_deathCounter = 0;
-        s_treeNftVerification = 0;
+        s_treeNftVerificationCounter = 0;
         s_userCounter = 0;
 
         careTokenContract = CareToken(_careTokenContract);
@@ -74,8 +74,8 @@ contract TreeNft is ERC721, Ownable {
         if (latitude > 180 * 1e6) revert InvalidCoordinates();
         if (longitude > 360 * 1e6) revert InvalidCoordinates();
 
-        uint256 tokenId = s_tokenCounter;
-        s_tokenCounter++;
+        uint256 tokenId = s_treeTokenCounter;
+        s_treeTokenCounter++;
 
         _mint(msg.sender, tokenId);
         address[] memory ancestors = new address[](1);
@@ -133,8 +133,8 @@ contract TreeNft is ERC721, Ownable {
     function getAllNFTs() public view returns (Tree[] memory) {
         // This function retrieves all NFTs in the contract
 
-        Tree[] memory allTrees = new Tree[](s_tokenCounter);
-        for (uint256 i = 0; i < s_tokenCounter; i++) {
+        Tree[] memory allTrees = new Tree[](s_treeTokenCounter);
+        for (uint256 i = 0; i < allTrees.length; i++) {
             allTrees[i] = s_tokenIDtoTree[i];
         }
         return allTrees;
@@ -148,7 +148,7 @@ contract TreeNft is ERC721, Ownable {
         // This function retrieves recent trees with pagination
 
         if (limit > 50) revert PaginationLimitExceeded();
-        uint256 totalTrees = s_tokenCounter;
+        uint256 totalTrees = s_treeTokenCounter;
         if (offset >= totalTrees) return (new Tree[](0), totalTrees, false);
         uint256 available = totalTrees - offset;
         uint256 toReturn = available < limit ? available : limit;
@@ -210,6 +210,11 @@ contract TreeNft is ERC721, Ownable {
     function verify(uint256 _tokenId, string[] memory _proofHashes, string memory _description) public {
         // This function allows a verifier to verify a tree
 
+        if (!_exists(_tokenId)) revert InvalidTreeID();
+        address treeOwner = ownerOf(_tokenId);
+        Tree memory tree = s_tokenIDtoTree[_tokenId];
+        if (msg.sender == treeOwner) revert CannotVerifyOwnTree();
+
         if (s_tokenIDtoUserVerification[_tokenId][msg.sender]) revert AlreadyVerified();
         if(s_userToPlanterTokenAddress[msg.sender] == address(0)) {
             PlanterToken planterToken = new PlanterToken(msg.sender);
@@ -218,26 +223,23 @@ contract TreeNft is ERC721, Ownable {
         address planterTokenContract = s_userToPlanterTokenAddress[msg.sender];
         PlanterToken planterToken = PlanterToken(planterTokenContract);
 
-        if (!_exists(_tokenId)) revert InvalidTreeID();
-        if (msg.sender == ownerOf(_tokenId)) revert CannotVerifyOwnTree();
         if (!isVerified(_tokenId, msg.sender)) {
         TreeNftVerification memory treeVerification =
             TreeNftVerification(msg.sender, block.timestamp, _proofHashes, _description, false, _tokenId, planterTokenContract);
-        Tree memory tree = s_tokenIDtoTree[_tokenId];
             s_tokenIDtoUserVerification[_tokenId][msg.sender] = true;
             s_tokenIDtoVerifiers[_tokenId].push(msg.sender);
-            s_verifierToTokenIDs[msg.sender].push(_tokenId);
-            s_tokenIDtoTreeNftVerfication[s_treeNftVerification] = treeVerification;
-            s_treeTokenIdToVerifications[_tokenId].push(s_treeNftVerification);
-            s_treeNftVerification++;
-            planterToken.mint(ownerOf(_tokenId), tree.numberOfTrees); // give the planter tokens of the verifier to the owner of the tree
+            s_verifierToTreeTokenIDs[msg.sender].push(_tokenId);
+            s_tokenIDtoTreeNftVerfication[s_treeNftVerificationCounter] = treeVerification;
+            s_treeTokenIdToVerifications[_tokenId].push(s_treeNftVerificationCounter);
+            s_treeNftVerificationCounter++;
+            planterToken.mint(ownerOf(_tokenId), tree.numberOfTrees);
             s_userToVerifierTokenAddresses[ownerOf(_tokenId)].push(planterTokenContract);
             s_userToVerifications[msg.sender].push(treeVerification);
         }
     }
 
     function removeVerification(uint256 _tokenId, address verifier) public {
-        // Thsi function facilitates the owner of the tree nft to remove fraudulent verifiers
+        // This function facilitates the owner of the tree nft to remove fraudulent verifiers
 
         if (msg.sender != ownerOf(_tokenId)) revert NotTreeOwner();
         uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
@@ -248,7 +250,6 @@ contract TreeNft is ERC721, Ownable {
 
                 User storage user = s_addressToUser[verifier];
                 user.verificationsRevoked++;
-
                 emit VerificationRemoved(verificationIds[i], _tokenId, verifier);
                 break;
             }
@@ -258,7 +259,7 @@ contract TreeNft is ERC721, Ownable {
     function getVerifiedTreesByUser(address verifier) public view returns (Tree[] memory) {
         // This function retrieves all trees verified by a specific verifier
 
-        uint256[] memory verifiedTokens = s_verifierToTokenIDs[verifier];
+        uint256[] memory verifiedTokens = s_verifierToTreeTokenIDs[verifier];
         Tree[] memory verifiedTrees = new Tree[](verifiedTokens.length);
         for (uint256 i = 0; i < verifiedTokens.length; i++) {
             uint256 tokenId = verifiedTokens[i];
@@ -274,7 +275,7 @@ contract TreeNft is ERC721, Ownable {
     {
         // Get the total number of trees verified by this verifier
 
-        uint256[] memory verifiedTokens = s_verifierToTokenIDs[verifier];
+        uint256[] memory verifiedTokens = s_verifierToTreeTokenIDs[verifier];
         totalCount = verifiedTokens.length;
         if (offset >= totalCount) {
             return (new Tree[](0), totalCount);
@@ -428,7 +429,7 @@ contract TreeNft is ERC721, Ownable {
     }
 
     function _exists(uint256 tokenId) internal view returns (bool) {
-        return tokenId < s_tokenCounter && tokenId >= 0;
+        return tokenId < s_treeTokenCounter && tokenId >= 0;
     }
 
     function ping() public pure returns (string memory) {
