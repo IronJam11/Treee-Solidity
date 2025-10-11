@@ -36,7 +36,7 @@ contract DeployAllContractsAtOnce is Script {
         console.log("  - LegacyToken deployed at:      ", legacyTokenAddress);
 
         console.log("\n>> Step 2: Deploying TreeNft Contract...");
-        TreeNft treeNft = new TreeNft(careTokenAddress,legacyTokenAddress);
+        TreeNft treeNft = new TreeNft(careTokenAddress, legacyTokenAddress);
         treeNftAddress = address(treeNft);
         console.log("  - TreeNft deployed at:          ", treeNftAddress);
 

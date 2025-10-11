@@ -26,7 +26,6 @@ contract DeployTreeNft is Script {
         careTokenAddress = address(careToken);
         console.log("CareToken deployed at:", careTokenAddress);
 
-
         LegacyToken legacyToken = new LegacyToken(deployer);
         legacyTokenAddress = address(legacyToken);
         console.log("LegacyToken deployed at:", legacyTokenAddress);

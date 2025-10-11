@@ -16,7 +16,6 @@ import "./token-contracts/CareToken.sol";
 import "./token-contracts/LegacyToken.sol";
 import "./token-contracts/PlanterToken.sol";
 
-
 contract TreeNft is ERC721, Ownable {
     uint256 private s_treeTokenCounter;
     uint256 private s_organisationCounter;
@@ -43,11 +42,10 @@ contract TreeNft is ERC721, Ownable {
 
     mapping(address => User) s_addressToUser;
 
-    constructor(
-        address _careTokenContract,
-        address _legacyTokenContract
-    ) Ownable(msg.sender) ERC721("TreeNFT", "TREE") {
-
+    constructor(address _careTokenContract, address _legacyTokenContract)
+        Ownable(msg.sender)
+        ERC721("TreeNFT", "TREE")
+    {
         s_treeTokenCounter = 0;
         s_organisationCounter = 0;
         s_deathCounter = 0;
@@ -81,7 +79,6 @@ contract TreeNft is ERC721, Ownable {
         address[] memory ancestors = new address[](1);
         ancestors[0] = msg.sender;
 
-        
         s_tokenIDtoTree[tokenId] = Tree(
             tokenId,
             latitude,
@@ -215,8 +212,10 @@ contract TreeNft is ERC721, Ownable {
         Tree memory tree = s_tokenIDtoTree[_tokenId];
         if (msg.sender == treeOwner) revert CannotVerifyOwnTree();
 
-        if (s_tokenIDtoUserVerification[_tokenId][msg.sender]) revert AlreadyVerified();
-        if(s_userToPlanterTokenAddress[msg.sender] == address(0)) {
+        if (s_tokenIDtoUserVerification[_tokenId][msg.sender]) {
+            revert AlreadyVerified();
+        }
+        if (s_userToPlanterTokenAddress[msg.sender] == address(0)) {
             PlanterToken planterToken = new PlanterToken(msg.sender);
             s_userToPlanterTokenAddress[msg.sender] = address(planterToken);
         }
@@ -224,8 +223,9 @@ contract TreeNft is ERC721, Ownable {
         PlanterToken planterToken = PlanterToken(planterTokenContract);
 
         if (!isVerified(_tokenId, msg.sender)) {
-        TreeNftVerification memory treeVerification =
-            TreeNftVerification(msg.sender, block.timestamp, _proofHashes, _description, false, _tokenId, planterTokenContract);
+            TreeNftVerification memory treeVerification = TreeNftVerification(
+                msg.sender, block.timestamp, _proofHashes, _description, false, _tokenId, planterTokenContract
+            );
             s_tokenIDtoUserVerification[_tokenId][msg.sender] = true;
             s_tokenIDtoVerifiers[_tokenId].push(msg.sender);
             s_verifierToTreeTokenIDs[msg.sender].push(_tokenId);
@@ -242,6 +242,29 @@ contract TreeNft is ERC721, Ownable {
         // This function facilitates the owner of the tree nft to remove fraudulent verifiers
 
         if (msg.sender != ownerOf(_tokenId)) revert NotTreeOwner();
+        if (!s_tokenIDtoUserVerification[_tokenId][verifier]) {
+            revert VerificationNotFound();
+        }
+        Tree memory tree = s_tokenIDtoTree[_tokenId];
+        address treeOwner = ownerOf(_tokenId);
+
+        s_tokenIDtoUserVerification[_tokenId][verifier] = false;
+        address[] storage verifiers = s_tokenIDtoVerifiers[_tokenId];
+        for (uint256 i = 0; i < verifiers.length; i++) {
+            if (verifiers[i] == verifier) {
+                verifiers[i] = verifiers[verifiers.length - 1];
+                verifiers.pop();
+                break;
+            }
+        }
+        uint256[] storage verifiedTrees = s_verifierToTreeTokenIDs[verifier];
+        for (uint256 i = 0; i < verifiedTrees.length; i++) {
+            if (verifiedTrees[i] == _tokenId) {
+                verifiedTrees[i] = verifiedTrees[verifiedTrees.length - 1];
+                verifiedTrees.pop();
+                break;
+            }
+        }
         uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
         for (uint256 i = 0; i < verificationIds.length; i++) {
             TreeNftVerification storage treeNftVerification = s_tokenIDtoTreeNftVerfication[verificationIds[i]];
@@ -250,6 +273,23 @@ contract TreeNft is ERC721, Ownable {
 
                 User storage user = s_addressToUser[verifier];
                 user.verificationsRevoked++;
+                address planterTokenAddr = s_userToPlanterTokenAddress[verifier];
+                if (planterTokenAddr != address(0)) {
+                    PlanterToken planterToken = PlanterToken(planterTokenAddr);
+                    uint256 tokensToReturn = tree.numberOfTrees;
+                    if (planterToken.balanceOf(treeOwner) >= tokensToReturn) {
+                        planterToken.burnFrom(treeOwner, tokensToReturn);
+                        address[] storage verifierTokenAddrs = s_userToVerifierTokenAddresses[treeOwner];
+                        for (uint256 j = 0; j < verifierTokenAddrs.length; j++) {
+                            if (verifierTokenAddrs[j] == planterTokenAddr) {
+                                verifierTokenAddrs[j] = verifierTokenAddrs[verifierTokenAddrs.length - 1];
+                                verifierTokenAddrs.pop();
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 emit VerificationRemoved(verificationIds[i], _tokenId, verifier);
                 break;
             }
@@ -359,7 +399,9 @@ contract TreeNft is ERC721, Ownable {
         // This function marks a tree as dead
 
         if (!_exists(tokenId)) revert InvalidTreeID();
-        if (s_tokenIDtoTree[tokenId].death != type(uint256).max) revert TreeAlreadyDead();
+        if (s_tokenIDtoTree[tokenId].death != type(uint256).max) {
+            revert TreeAlreadyDead();
+        }
         if (ownerOf(tokenId) != msg.sender) revert NotTreeOwner();
         if (s_tokenIDtoTree[tokenId].planting + minimumTimeToMarkTreeDead >= block.timestamp) {
             revert MinimumMarkDeadTimeNotReached();
@@ -374,7 +416,9 @@ contract TreeNft is ERC721, Ownable {
     function registerUserProfile(string memory _name, string memory _profilePhotoHash) public {
         // This function registers a user
 
-        if (s_addressToUser[msg.sender].userAddress != address(0)) revert UserAlreadyRegistered();
+        if (s_addressToUser[msg.sender].userAddress != address(0)) {
+            revert UserAlreadyRegistered();
+        }
         User memory user = User(msg.sender, _profilePhotoHash, _name, block.timestamp, 0, 0);
         s_addressToUser[msg.sender] = user;
         s_userCounter++;
@@ -383,7 +427,9 @@ contract TreeNft is ERC721, Ownable {
     function getUserProfile(address userAddress) public view returns (UserDetails memory userDetails) {
         // This function returns the details of the user
 
-        if (s_addressToUser[userAddress].userAddress == address(0)) revert UserNotRegistered();
+        if (s_addressToUser[userAddress].userAddress == address(0)) {
+            revert UserNotRegistered();
+        }
         User memory storedUserDetails = s_addressToUser[userAddress];
         userDetails.name = storedUserDetails.name;
         userDetails.dateJoined = storedUserDetails.dateJoined;
@@ -396,11 +442,15 @@ contract TreeNft is ERC721, Ownable {
         return userDetails;
     }
 
-    function getUserVerifierTokenDetails(address userAddress) public view returns (VerificationDetails[] memory verifierTokenDetails) {
+    function getUserVerifierTokenDetails(address userAddress)
+        public
+        view
+        returns (VerificationDetails[] memory verifierTokenDetails)
+    {
         // This function returns the verifier token address of the user
 
         TreeNftVerification[] memory userVerifications = s_userToVerifications[userAddress];
-        for(uint i = 0; i < userVerifications.length; i++) {
+        for (uint256 i = 0; i < userVerifications.length; i++) {
             PlanterToken planterToken = PlanterToken(userVerifications[i].verifierPlanterTokenAddress);
             verifierTokenDetails[i] = VerificationDetails({
                 verifier: userVerifications[i].verifier,
@@ -417,7 +467,9 @@ contract TreeNft is ERC721, Ownable {
     function updateUserDetails(string memory _name, string memory _profilePhotoHash) public {
         // This function enables a user to change his user details
 
-        if (s_addressToUser[msg.sender].userAddress == address(0)) revert UserNotRegistered();
+        if (s_addressToUser[msg.sender].userAddress == address(0)) {
+            revert UserNotRegistered();
+        }
         s_addressToUser[msg.sender].name = _name;
         s_addressToUser[msg.sender].profilePhotoIpfs = _profilePhotoHash;
     }
