@@ -21,6 +21,17 @@ struct TreeNftVerification {
     string description;
     bool isHidden;
     uint256 treeNftId;
+    address verifierPlanterTokenAddress;    
+}
+
+struct VerificationDetails {
+    address verifier;
+    uint256 timestamp;
+    string[] proofHashes;
+    string description;
+    bool isHidden;
+    uint256 numberOfTrees;
+    address verifierPlanterTokenAddress;   
 }
 
 struct OrganisationVerificationRequest {
@@ -50,11 +61,10 @@ struct UserDetails {
     uint256 dateJoined;
     uint256 verificationsRevoked;
     uint256 reportedSpam;
-    uint256 verifierTokens;
-    uint256 planterTokens;
     uint256 legacyTokens;
     uint256 careTokens;
 }
+
 
 struct Tree {
     uint256 id;
@@ -71,6 +81,7 @@ struct Tree {
     address[] ancestors;
     uint256 lastCareTimestamp;
     uint256 careCount;
+    uint256 numberOfTrees;
 }
 
 struct TreePlantingProposal {

@@ -26,41 +26,35 @@ contract TreeNft is ERC721, Ownable {
 
     uint256 public minimumTimeToMarkTreeDead = 365 days;
     CareToken public careTokenContract;
-    PlanterToken public planterTokenContract;
-    VerifierToken public verifierTokenContract;
     LegacyToken public legacyToken;
 
     mapping(uint256 => Tree) private s_tokenIDtoTree;
+    mapping(uint256 => address) private s_tokenIDtoVerificationContracts;
     mapping(uint256 => address[]) private s_tokenIDtoVerifiers;
     mapping(address => uint256[]) private s_userToNFTs;
+    mapping(address => address) public s_userToPlanterTokenAddress;
+    mapping(address => address[]) public s_userToVerifierTokenAddresses;
 
     mapping(uint256 => mapping(address => bool)) private s_tokenIDtoUserVerification;
     mapping(address => uint256[]) private s_verifierToTokenIDs;
     mapping(uint256 => TreeNftVerification) private s_tokenIDtoTreeNftVerfication;
     mapping(uint256 => uint256[]) private s_treeTokenIdToVerifications;
+    mapping(address => TreeNftVerification[]) private s_userToVerifications;
 
     mapping(address => User) s_addressToUser;
 
     constructor(
         address _careTokenContract,
-        address _planterTokenContract,
-        address _verifierTokenContract,
         address _legacyTokenContract
     ) Ownable(msg.sender) ERC721("TreeNFT", "TREE") {
+
         s_tokenCounter = 0;
         s_organisationCounter = 0;
         s_deathCounter = 0;
         s_treeNftVerification = 0;
         s_userCounter = 0;
 
-        if (_careTokenContract == address(0)) revert InvalidInput();
-        if (_planterTokenContract == address(0)) revert InvalidInput();
-        if (_verifierTokenContract == address(0)) revert InvalidInput();
-        if (_legacyTokenContract == address(0)) revert InvalidInput();
-
         careTokenContract = CareToken(_careTokenContract);
-        planterTokenContract = PlanterToken(_planterTokenContract);
-        verifierTokenContract = VerifierToken(_verifierTokenContract);
         legacyToken = LegacyToken(_legacyTokenContract);
     }
 
@@ -74,7 +68,8 @@ contract TreeNft is ERC721, Ownable {
         string memory qrIpfsHash,
         string memory metadata,
         string memory geoHash,
-        string[] memory initialPhotos
+        string[] memory initialPhotos,
+        uint256 numberOfTrees
     ) public {
         if (latitude > 180 * 1e6) revert InvalidCoordinates();
         if (longitude > 360 * 1e6) revert InvalidCoordinates();
@@ -85,6 +80,8 @@ contract TreeNft is ERC721, Ownable {
         _mint(msg.sender, tokenId);
         address[] memory ancestors = new address[](1);
         ancestors[0] = msg.sender;
+
+        
         s_tokenIDtoTree[tokenId] = Tree(
             tokenId,
             latitude,
@@ -99,11 +96,11 @@ contract TreeNft is ERC721, Ownable {
             geoHash,
             ancestors,
             block.timestamp,
-            0
+            0,
+            numberOfTrees
         );
 
         s_userToNFTs[msg.sender].push(tokenId);
-        planterTokenContract.mint(msg.sender, 1);
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
@@ -213,18 +210,29 @@ contract TreeNft is ERC721, Ownable {
     function verify(uint256 _tokenId, string[] memory _proofHashes, string memory _description) public {
         // This function allows a verifier to verify a tree
 
+        if (s_tokenIDtoUserVerification[_tokenId][msg.sender]) revert AlreadyVerified();
+        if(s_userToPlanterTokenAddress[msg.sender] == address(0)) {
+            PlanterToken planterToken = new PlanterToken(msg.sender);
+            s_userToPlanterTokenAddress[msg.sender] = address(planterToken);
+        }
+        address planterTokenContract = s_userToPlanterTokenAddress[msg.sender];
+        PlanterToken planterToken = PlanterToken(planterTokenContract);
+
         if (!_exists(_tokenId)) revert InvalidTreeID();
-        TreeNftVerification memory treeVerification =
-            TreeNftVerification(msg.sender, block.timestamp, _proofHashes, _description, false, _tokenId);
+        if (msg.sender == ownerOf(_tokenId)) revert CannotVerifyOwnTree();
         if (!isVerified(_tokenId, msg.sender)) {
+        TreeNftVerification memory treeVerification =
+            TreeNftVerification(msg.sender, block.timestamp, _proofHashes, _description, false, _tokenId, planterTokenContract);
+        Tree memory tree = s_tokenIDtoTree[_tokenId];
             s_tokenIDtoUserVerification[_tokenId][msg.sender] = true;
             s_tokenIDtoVerifiers[_tokenId].push(msg.sender);
             s_verifierToTokenIDs[msg.sender].push(_tokenId);
             s_tokenIDtoTreeNftVerfication[s_treeNftVerification] = treeVerification;
             s_treeTokenIdToVerifications[_tokenId].push(s_treeNftVerification);
             s_treeNftVerification++;
-            verifierTokenContract.mint(msg.sender, 1);
-            planterTokenContract.mint(ownerOf(_tokenId), 1);
+            planterToken.mint(ownerOf(_tokenId), tree.numberOfTrees); // give the planter tokens of the verifier to the owner of the tree
+            s_userToVerifierTokenAddresses[ownerOf(_tokenId)].push(planterTokenContract);
+            s_userToVerifications[msg.sender].push(treeVerification);
         }
     }
 
@@ -383,10 +391,26 @@ contract TreeNft is ERC721, Ownable {
         userDetails.reportedSpam = storedUserDetails.reportedSpam;
         userDetails.verificationsRevoked = storedUserDetails.verificationsRevoked;
         userDetails.careTokens = careTokenContract.balanceOf(userAddress);
-        userDetails.planterTokens = planterTokenContract.balanceOf(userAddress);
         userDetails.legacyTokens = legacyToken.balanceOf(userAddress);
-        userDetails.verifierTokens = verifierTokenContract.balanceOf(userAddress);
         return userDetails;
+    }
+
+    function getUserVerifierTokenDetails(address userAddress) public view returns (VerificationDetails[] memory verifierTokenDetails) {
+        // This function returns the verifier token address of the user
+
+        TreeNftVerification[] memory userVerifications = s_userToVerifications[userAddress];
+        for(uint i = 0; i < userVerifications.length; i++) {
+            PlanterToken planterToken = PlanterToken(userVerifications[i].verifierPlanterTokenAddress);
+            verifierTokenDetails[i] = VerificationDetails({
+                verifier: userVerifications[i].verifier,
+                timestamp: userVerifications[i].timestamp,
+                proofHashes: userVerifications[i].proofHashes,
+                description: userVerifications[i].description,
+                isHidden: userVerifications[i].isHidden,
+                numberOfTrees: planterToken.balanceOf(userAddress),
+                verifierPlanterTokenAddress: userVerifications[i].verifierPlanterTokenAddress
+            });
+        }
     }
 
     function updateUserDetails(string memory _name, string memory _profilePhotoHash) public {

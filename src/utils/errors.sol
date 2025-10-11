@@ -43,6 +43,7 @@ error InvalidNameInput();
 error InvalidTreeID();
 error MinimumMarkDeadTimeNotReached();
 error InvalidCoordinates();
+error CannotVerifyOwnTree();
 
 /// User
 error UserAlreadyRegistered();
