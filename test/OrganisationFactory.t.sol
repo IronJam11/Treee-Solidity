@@ -28,10 +28,10 @@ contract OrganisationFactoryTest is Test {
 
     string constant NAME1 = "Test Organisation";
     string constant DESCRIPTION1 = "This is a test organisation.";
-    string constant PHOTO_IPFS_HASH1 = "QmTestPhotoHash";
+    string constant PHOTO_HASH1 = "QmTestPhotoHash";
     string constant NAME2 = "Test Organisation";
     string constant DESCRIPTION2 = "This is a test organisation.";
-    string constant PHOTO_IPFS_HASH2 = "QmTestPhotoHash";
+    string constant PHOTO_HASH2 = "QmTestPhotoHash";
 
     function setUp() public {
         vm.startPrank(owner);
@@ -69,7 +69,7 @@ contract OrganisationFactoryTest is Test {
         // This test checks if the createOrganisation function works correctly by creating an organisation and verifying its details.
 
         vm.prank(user1);
-        (uint256 orgId, address orgAddress) = factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_IPFS_HASH1);
+        (uint256 orgId, address orgAddress) = factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_HASH1);
         assertEq(orgId, 0);
         assertEq(factory.getOrganisationCount(), 1);
         (
@@ -84,7 +84,7 @@ contract OrganisationFactoryTest is Test {
         assert(organizationAddress == orgAddress);
         assertEq(name, NAME1);
         assertEq(description, DESCRIPTION1);
-        assertEq(photoIpfsHash, PHOTO_IPFS_HASH1);
+        assertEq(photoIpfsHash, PHOTO_HASH1);
         assertEq(owners[0], user1);
         assertEq(members.length, 1);
         assertEq(timeOfCreation, block.timestamp);
@@ -94,10 +94,10 @@ contract OrganisationFactoryTest is Test {
         // This test checks if the getMyOrganisations function returns the correct organisation details for a user.
 
         vm.prank(user1);
-        factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_IPFS_HASH1);
+        factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_HASH1);
         vm.stopPrank();
         vm.prank(user2);
-        factory.createOrganisation(NAME2, DESCRIPTION2, PHOTO_IPFS_HASH2);
+        factory.createOrganisation(NAME2, DESCRIPTION2, PHOTO_HASH2);
         vm.stopPrank();
 
         vm.startPrank(user1);
@@ -115,22 +115,22 @@ contract OrganisationFactoryTest is Test {
         // This test checks if the factory can return all organisations correctly.
 
         vm.prank(user1);
-        factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_IPFS_HASH1);
+        factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_HASH1);
         vm.stopPrank();
         vm.prank(user2);
-        factory.createOrganisation(NAME2, DESCRIPTION2, PHOTO_IPFS_HASH2);
+        factory.createOrganisation(NAME2, DESCRIPTION2, PHOTO_HASH2);
         vm.stopPrank();
 
         OrganisationDetails[] memory orgs = factory.getAllOrganisationDetails();
         assertEq(orgs.length, 2);
         assertEq(orgs[0].name, NAME1);
         assertEq(orgs[0].description, DESCRIPTION1);
-        assertEq(orgs[0].photoIpfsHash, PHOTO_IPFS_HASH1);
+        assertEq(orgs[0].organisationPhoto, PHOTO_HASH1);
         assertEq(orgs[0].ownerCount, 1);
         assertEq(orgs[0].memberCount, 1);
         assertEq(orgs[1].name, NAME2);
         assertEq(orgs[1].description, DESCRIPTION2);
-        assertEq(orgs[1].photoIpfsHash, PHOTO_IPFS_HASH2);
+        assertEq(orgs[1].organisationPhoto, PHOTO_HASH2);
         assertEq(orgs[1].ownerCount, 1);
         assertEq(orgs[1].memberCount, 1);
     }
@@ -139,10 +139,10 @@ contract OrganisationFactoryTest is Test {
         // This test checks if the factory can return all organisation IDs correctly.
 
         vm.prank(user1);
-        factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_IPFS_HASH1);
+        factory.createOrganisation(NAME1, DESCRIPTION1, PHOTO_HASH1);
         vm.stopPrank();
         vm.prank(user2);
-        factory.createOrganisation(NAME2, DESCRIPTION2, PHOTO_IPFS_HASH2);
+        factory.createOrganisation(NAME2, DESCRIPTION2, PHOTO_HASH2);
         vm.stopPrank();
 
         address[] memory orgAddresses = factory.getAllOrganisations();

@@ -56,7 +56,7 @@ contract TreeNftVerificationTest is Test {
 
         address planterTokenAddr = treeNft.s_userToPlanterTokenAddress(verifier1);
         PlanterToken planterToken = PlanterToken(planterTokenAddr);
-        assertEq(planterToken.balanceOf(planter), NUM_TREES);
+        assertEq(planterToken.balanceOf(planter), NUM_TREES * 1e18);
     }
 
     function test_cannotVerifyOwnTree() public {
@@ -110,8 +110,8 @@ contract TreeNftVerificationTest is Test {
         address planterToken1 = treeNft.s_userToPlanterTokenAddress(verifier1);
         address planterToken2 = treeNft.s_userToPlanterTokenAddress(verifier2);
 
-        assertEq(PlanterToken(planterToken1).balanceOf(planter), NUM_TREES);
-        assertEq(PlanterToken(planterToken2).balanceOf(planter), NUM_TREES);
+        assertEq(PlanterToken(planterToken1).balanceOf(planter), NUM_TREES * 1e18);
+        assertEq(PlanterToken(planterToken2).balanceOf(planter), NUM_TREES * 1e18);
     }
 
     function test_removeVerification() public {
@@ -127,7 +127,7 @@ contract TreeNftVerificationTest is Test {
         assertTrue(treeNft.isVerified(0, verifier1));
         address planterTokenAddr = treeNft.s_userToPlanterTokenAddress(verifier1);
         PlanterToken planterToken = PlanterToken(planterTokenAddr);
-        assertEq(planterToken.balanceOf(planter), NUM_TREES);
+        assertEq(planterToken.balanceOf(planter), NUM_TREES * 1e18);
 
         vm.prank(planter);
         treeNft.removeVerification(0, verifier1);
@@ -186,7 +186,7 @@ contract TreeNftVerificationTest is Test {
         address planterTokenAddr = treeNft.s_userToPlanterTokenAddress(verifier1);
         PlanterToken planterToken = PlanterToken(planterTokenAddr);
         uint256 initialBalance = planterToken.balanceOf(planter);
-        assertEq(initialBalance, NUM_TREES);
+        assertEq(initialBalance, NUM_TREES * 1e18);
         vm.prank(planter);
         treeNft.removeVerification(0, verifier1);
 
@@ -262,10 +262,10 @@ contract TreeNftVerificationTest is Test {
         address planterTokenAddr = treeNft.s_userToPlanterTokenAddress(verifier1);
         PlanterToken planterToken = PlanterToken(planterTokenAddr);
         vm.prank(planter);
-        planterToken.transfer(address(0x999), NUM_TREES / 2);
+        planterToken.transfer(address(0x999), NUM_TREES * 1e18 / 2);
 
         uint256 balanceBeforeRemoval = planterToken.balanceOf(planter);
-        assertLt(balanceBeforeRemoval, NUM_TREES);
+        assertLt(balanceBeforeRemoval, NUM_TREES * 1e18);
         vm.prank(planter);
         treeNft.removeVerification(0, verifier1);
         assertFalse(treeNft.isVerified(0, verifier1));

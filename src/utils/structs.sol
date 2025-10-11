@@ -5,7 +5,7 @@ struct OrganisationDetails {
     address contractAddress;
     string name;
     string description;
-    string photoIpfsHash;
+    string organisationPhoto;
     address[] owners;
     address[] members;
     uint256 ownerCount;
@@ -47,7 +47,7 @@ struct OrganisationVerificationRequest {
 
 struct User {
     address userAddress;
-    string profilePhotoIpfs;
+    string profilePhoto;
     string name;
     uint256 dateJoined;
     uint256 verificationsRevoked;
@@ -56,7 +56,7 @@ struct User {
 
 struct UserDetails {
     address userAddress;
-    string profilePhotoIpfs;
+    string profilePhoto;
     string name;
     uint256 dateJoined;
     uint256 verificationsRevoked;
@@ -73,7 +73,7 @@ struct Tree {
     uint256 death;
     string species;
     string imageUri;
-    string qrIpfsHash;
+    string qrPhoto;
     string metadata;
     string[] photos;
     string geoHash;
@@ -89,7 +89,7 @@ struct TreePlantingProposal {
     uint256 longitude;
     string species;
     string imageUri;
-    string qrIpfsHash;
+    string qrPhoto;
     string[] photos;
     string geoHash;
     string metadata;
