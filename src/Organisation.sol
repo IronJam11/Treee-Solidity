@@ -278,7 +278,8 @@ contract Organisation {
             geoHash: geoHash,
             metadata: _metadata,
             status: 0,
-            numberOfTrees: numberOfTrees
+            numberOfTrees: numberOfTrees,
+            initiator: msg.sender
         });
         if (checkOwnership(msg.sender)) {
             s_treeProposalYesVoters[s_treePlantingProposalCounter].push(msg.sender);
