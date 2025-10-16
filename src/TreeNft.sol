@@ -271,6 +271,18 @@ contract TreeNft is ERC721, Ownable {
             if (treeNftVerification.verifier == verifier && !treeNftVerification.isHidden) {
                 treeNftVerification.isHidden = true;
 
+                // Also update the verification in the user's array
+                TreeNftVerification[] storage userVerifications = s_userToVerifications[verifier];
+                for (uint256 j = 0; j < userVerifications.length; j++) {
+                    if (
+                        userVerifications[j].treeNftId == _tokenId && userVerifications[j].verifier == verifier
+                            && !userVerifications[j].isHidden
+                    ) {
+                        userVerifications[j].isHidden = true;
+                        break;
+                    }
+                }
+
                 User storage user = s_addressToUser[verifier];
                 user.verificationsRevoked++;
                 address planterTokenAddr = s_userToPlanterTokenAddress[verifier];
@@ -442,26 +454,38 @@ contract TreeNft is ERC721, Ownable {
         return userDetails;
     }
 
-    function getUserVerifierTokenDetails(address userAddress)
+    function getUserVerifierTokenDetails(address userAddress, uint256 offset, uint256 limit)
         public
         view
-        returns (VerificationDetails[] memory verifierTokenDetails)
+        returns (VerificationDetails[] memory verifierTokenDetails, uint256 totalCount)
     {
-        // This function returns the verifier token address of the user
+        // This function returns the verifier token details of the user with pagination
 
         TreeNftVerification[] memory userVerifications = s_userToVerifications[userAddress];
-        for (uint256 i = 0; i < userVerifications.length; i++) {
-            PlanterToken planterToken = PlanterToken(userVerifications[i].verifierPlanterTokenAddress);
+        totalCount = userVerifications.length;
+        if (offset >= totalCount) {
+            return (new VerificationDetails[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        verifierTokenDetails = new VerificationDetails[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            uint256 verificationIndex = offset + i;
+            PlanterToken planterToken = PlanterToken(userVerifications[verificationIndex].verifierPlanterTokenAddress);
             verifierTokenDetails[i] = VerificationDetails({
-                verifier: userVerifications[i].verifier,
-                timestamp: userVerifications[i].timestamp,
-                proofHashes: userVerifications[i].proofHashes,
-                description: userVerifications[i].description,
-                isHidden: userVerifications[i].isHidden,
+                verifier: userVerifications[verificationIndex].verifier,
+                timestamp: userVerifications[verificationIndex].timestamp,
+                proofHashes: userVerifications[verificationIndex].proofHashes,
+                description: userVerifications[verificationIndex].description,
+                isHidden: userVerifications[verificationIndex].isHidden,
                 numberOfTrees: planterToken.balanceOf(userAddress),
-                verifierPlanterTokenAddress: userVerifications[i].verifierPlanterTokenAddress
+                verifierPlanterTokenAddress: userVerifications[verificationIndex].verifierPlanterTokenAddress
             });
         }
+        return (verifierTokenDetails, totalCount);
     }
 
     function updateUserDetails(string memory _name, string memory _profilePhoto) public {

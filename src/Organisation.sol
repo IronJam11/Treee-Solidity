@@ -175,6 +175,7 @@ contract Organisation {
 
     function getVerificationRequests(uint256 status) external view returns (OrganisationVerificationRequest[] memory) {
         // First pass: count matching requests
+
         uint256 matchCount = 0;
         for (uint256 i = 0; i < s_verificationCounter; i++) {
             if (s_verificationIDtoVerification[i].status == status) {
