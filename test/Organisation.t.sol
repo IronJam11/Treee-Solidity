@@ -12,7 +12,6 @@ import "../src/TreeNft.sol";
 
 import "../src/token-contracts/CareToken.sol";
 import "../src/token-contracts/PlanterToken.sol";
-import "../src/token-contracts/VerifierToken.sol";
 import "../src/token-contracts/LegacyToken.sol";
 
 contract OrganisationTest is Test {
@@ -20,7 +19,6 @@ contract OrganisationTest is Test {
     TreeNft private treeNft;
     CareToken public careToken;
     PlanterToken public planterToken;
-    VerifierToken public verifierToken;
     LegacyToken public legacyToken;
 
     address private owner = address(0x1);
@@ -32,7 +30,7 @@ contract OrganisationTest is Test {
     uint256 constant LONGITUDE = 9876543;
     string constant SPECIES = "Oak";
     string constant IMAGE_URI = "https://example.com/tree.jpg";
-    string constant QR_IPFS_HASH = "QmTestQrHash";
+    string constant QR_HASH = "QmTestQrHash";
     string constant GEOHASH = "u4pruydqqvj";
     string constant NAME = "Test Organisation";
     string constant DESCRIPTION = "This is a test organisation.";
@@ -41,32 +39,28 @@ contract OrganisationTest is Test {
     string constant DESCRIPTION2 = "This is a test organisation.";
     string constant PHOTO_IPFS_HASH2 = "QmTestPhotoHash";
     string constant JOIN_REQUEST_DESCRIPTION = "I want to join this organisation";
+    string constant METADATA = "ipfs://metaDataHash";
+    uint256 constant NUMBER_OF_TREES = 1;
 
     function setUp() public {
         vm.startPrank(owner);
 
         careToken = new CareToken(owner);
         planterToken = new PlanterToken(owner);
-        verifierToken = new VerifierToken(owner);
         legacyToken = new LegacyToken(owner);
 
-        treeNft = new TreeNft(address(careToken), address(planterToken), address(verifierToken), address(legacyToken));
+        treeNft = new TreeNft(address(careToken), address(legacyToken));
 
         careToken.transferOwnership(address(treeNft));
         planterToken.transferOwnership(address(treeNft));
-        verifierToken.transferOwnership(address(treeNft));
         legacyToken.transferOwnership(address(treeNft));
 
         vm.stopPrank();
 
         assertEq(careToken.owner(), address(treeNft));
-        assertEq(planterToken.owner(), address(treeNft));
-        assertEq(verifierToken.owner(), address(treeNft));
         assertEq(legacyToken.owner(), address(treeNft));
 
         assertEq(address(treeNft.careTokenContract()), address(careToken));
-        assertEq(address(treeNft.planterTokenContract()), address(planterToken));
-        assertEq(address(treeNft.verifierTokenContract()), address(verifierToken));
         assertEq(address(treeNft.legacyToken()), address(legacyToken));
 
         vm.startPrank(owner);
@@ -158,7 +152,9 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, GEOHASH, imageHashes);
+        treeNft.mintNft(
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_HASH, METADATA, GEOHASH, imageHashes, NUMBER_OF_TREES
+        );
         vm.stopPrank();
 
         vm.prank(user2);
@@ -190,7 +186,9 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, GEOHASH, imageHashes);
+        treeNft.mintNft(
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_HASH, METADATA, GEOHASH, imageHashes, NUMBER_OF_TREES
+        );
         vm.stopPrank();
 
         vm.prank(user1);
@@ -240,7 +238,7 @@ contract OrganisationTest is Test {
 
         vm.prank(user1);
         Organisation(orgAddress).plantTreeProposal(
-            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, proofHashes, GEOHASH
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_HASH, METADATA, proofHashes, GEOHASH, NUMBER_OF_TREES
         );
         vm.stopPrank();
 
@@ -254,7 +252,7 @@ contract OrganisationTest is Test {
         assertEq(proposal.longitude, LONGITUDE);
         assertEq(proposal.species, SPECIES);
         assertEq(proposal.imageUri, IMAGE_URI);
-        assertEq(proposal.qrIpfsHash, QR_IPFS_HASH);
+        assertEq(proposal.qrPhoto, QR_HASH);
         assertEq(proposal.geoHash, GEOHASH);
     }
 
@@ -270,7 +268,9 @@ contract OrganisationTest is Test {
         imageHashes[0] = "QmProofHash";
 
         vm.prank(user3);
-        treeNft.mintNft(LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, GEOHASH, imageHashes);
+        treeNft.mintNft(
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_HASH, METADATA, GEOHASH, imageHashes, NUMBER_OF_TREES
+        );
         vm.stopPrank();
 
         vm.prank(user1);
@@ -293,7 +293,7 @@ contract OrganisationTest is Test {
         string[] memory proofHashes = new string[](1);
         proofHashes[0] = "QmProofHash";
         Organisation(orgAddress).plantTreeProposal(
-            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_IPFS_HASH, proofHashes, GEOHASH
+            LATITUDE, LONGITUDE, SPECIES, IMAGE_URI, QR_HASH, METADATA, proofHashes, GEOHASH, NUMBER_OF_TREES
         );
         vm.stopPrank();
 

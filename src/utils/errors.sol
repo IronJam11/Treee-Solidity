@@ -27,6 +27,7 @@ error InvalidProposalId();
 error AlreadyVoted();
 error InvalidInput();
 error PaginationLimitExceeded();
+error InvalidContractAddress();
 
 /// Request
 error InvalidRequestId();
@@ -42,7 +43,13 @@ error InvalidNameInput();
 error InvalidTreeID();
 error MinimumMarkDeadTimeNotReached();
 error InvalidCoordinates();
+error CannotVerifyOwnTree();
+error VerificationNotFound();
 
 /// User
 error UserAlreadyRegistered();
 error UserNotRegistered();
+
+/// Deploy
+
+error OwnershipNotTransferred();

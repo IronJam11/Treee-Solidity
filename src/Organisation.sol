@@ -257,9 +257,11 @@ contract Organisation {
         uint256 _longitude,
         string memory _species,
         string memory _imageURI,
-        string memory _qrIpfshash,
+        string memory _qrPhoto,
+        string memory _metadata,
         string[] memory photos,
-        string memory geoHash
+        string memory geoHash,
+        uint256 numberOfTrees
     ) public {
         if (_latitude > 180 * 1e6) revert InvalidCoordinates();
         if (_longitude > 360 * 1e6) revert InvalidCoordinates();
@@ -271,10 +273,13 @@ contract Organisation {
             longitude: _longitude,
             species: _species,
             imageUri: _imageURI,
-            qrIpfsHash: _qrIpfshash,
+            qrPhoto: _qrPhoto,
             photos: photos,
             geoHash: geoHash,
-            status: 0
+            metadata: _metadata,
+            status: 0,
+            numberOfTrees: numberOfTrees,
+            initiator: msg.sender
         });
         if (checkOwnership(msg.sender)) {
             s_treeProposalYesVoters[s_treePlantingProposalCounter].push(msg.sender);
@@ -285,9 +290,11 @@ contract Organisation {
                     proposal.longitude,
                     proposal.species,
                     proposal.imageUri,
-                    proposal.qrIpfsHash,
+                    proposal.qrPhoto,
+                    proposal.metadata,
                     proposal.geoHash,
-                    proposal.photos
+                    proposal.photos,
+                    proposal.numberOfTrees
                 );
             }
         }
@@ -397,9 +404,11 @@ contract Organisation {
                 proposal.longitude,
                 proposal.species,
                 proposal.imageUri,
-                proposal.qrIpfsHash,
+                proposal.qrPhoto,
+                proposal.metadata,
                 proposal.geoHash,
-                proposal.photos
+                proposal.photos,
+                proposal.numberOfTrees
             );
         } else if (s_treeProposalNoVoters[proposalID].length >= requiredVotes) {
             proposal.status = 2;
