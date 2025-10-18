@@ -127,14 +127,21 @@ contract TreeNft is ERC721, Ownable {
         return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 
-    function getAllNFTs() public view returns (Tree[] memory) {
-        // This function retrieves all NFTs in the contract
-
-        Tree[] memory allTrees = new Tree[](s_treeTokenCounter);
-        for (uint256 i = 0; i < allTrees.length; i++) {
-            allTrees[i] = s_tokenIDtoTree[i];
+    function getAllNFTs(uint256 offset, uint256 limit) public view returns (Tree[] memory trees, uint256 totalCount) {
+        totalCount = s_treeTokenCounter;
+        if (offset >= totalCount) {
+            return (new Tree[](0), totalCount);
         }
-        return allTrees;
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        trees = new Tree[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            trees[i] = s_tokenIDtoTree[offset + i];
+        }
+        return (trees, totalCount);
     }
 
     function getRecentTreesPaginated(uint256 offset, uint256 limit)
@@ -156,18 +163,6 @@ contract TreeNft is ERC721, Ownable {
         }
         bool hasMoreTrees = offset + toReturn < totalTrees;
         return (result, totalTrees, hasMoreTrees);
-    }
-
-    function getNFTsByUser(address user) public view returns (Tree[] memory) {
-        // This function retrieves all NFTs owned by a specific user
-
-        uint256[] memory userNFTs = s_userToNFTs[user];
-        Tree[] memory userTrees = new Tree[](userNFTs.length);
-        for (uint256 i = 0; i < userNFTs.length; i++) {
-            uint256 tokenId = userNFTs[i];
-            userTrees[i] = s_tokenIDtoTree[tokenId];
-        }
-        return userTrees;
     }
 
     function getNFTsByUserPaginated(address user, uint256 offset, uint256 limit)
@@ -308,18 +303,6 @@ contract TreeNft is ERC721, Ownable {
         }
     }
 
-    function getVerifiedTreesByUser(address verifier) public view returns (Tree[] memory) {
-        // This function retrieves all trees verified by a specific verifier
-
-        uint256[] memory verifiedTokens = s_verifierToTreeTokenIDs[verifier];
-        Tree[] memory verifiedTrees = new Tree[](verifiedTokens.length);
-        for (uint256 i = 0; i < verifiedTokens.length; i++) {
-            uint256 tokenId = verifiedTokens[i];
-            verifiedTrees[i] = s_tokenIDtoTree[tokenId];
-        }
-        return verifiedTrees;
-    }
-
     function getVerifiedTreesByUserPaginated(address verifier, uint256 offset, uint256 limit)
         public
         view
@@ -344,28 +327,6 @@ contract TreeNft is ERC721, Ownable {
         }
 
         return (trees, totalCount);
-    }
-
-    function getTreeNftVerifiers(uint256 _tokenId) public view returns (TreeNftVerification[] memory) {
-        // This function retrieves all verifiers for a specific tree
-
-        uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
-        uint256 visibleCount;
-        for (uint256 i = 0; i < verificationIds.length; i++) {
-            if (!s_tokenIDtoTreeNftVerfication[verificationIds[i]].isHidden) {
-                visibleCount++;
-            }
-        }
-        TreeNftVerification[] memory treeNftVerifications = new TreeNftVerification[](visibleCount);
-        uint256 currentIndex;
-        for (uint256 i = 0; i < verificationIds.length; i++) {
-            TreeNftVerification memory verification = s_tokenIDtoTreeNftVerfication[verificationIds[i]];
-            if (!verification.isHidden) {
-                treeNftVerifications[currentIndex] = verification;
-                currentIndex++;
-            }
-        }
-        return treeNftVerifications;
     }
 
     function getTreeNftVerifiersPaginated(uint256 _tokenId, uint256 offset, uint256 limit)

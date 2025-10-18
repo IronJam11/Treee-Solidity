@@ -11,6 +11,8 @@ contract OrganisationFactory is Ownable {
 
     mapping(address => Organisation) public s_organisationAddressToOrganisation;
     mapping(address => address[]) public s_userToOrganisations;
+    mapping(address => address[]) private s_userToOrganisationsAsOwner;
+    mapping(address => address[]) private s_userToOrganisationsAsMember;
     mapping(address => bool) private s_isOrganisation;
 
     address[] private s_allOrganisations;
@@ -33,28 +35,62 @@ contract OrganisationFactory is Ownable {
         );
         organisationAddress = address(newOrganisation);
         s_userToOrganisations[msg.sender].push(organisationAddress);
+        s_userToOrganisationsAsOwner[msg.sender].push(organisationAddress);
         s_isOrganisation[organisationAddress] = true;
         s_allOrganisations.push(organisationAddress);
         s_organisationAddressToOrganisation[organisationAddress] = newOrganisation;
         return (organisationId, organisationAddress);
     }
 
-    function getUserOrganisations(address _user) external view returns (address[] memory) {
-        // This function retrieves the list of organization IDs associated with a user.
-
-        return s_userToOrganisations[_user];
+    function getUserOrganisations(address _user, uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory orgs, uint256 totalCount)
+    {
+        address[] memory allUserOrgs = s_userToOrganisations[_user];
+        totalCount = allUserOrgs.length;
+        if (offset >= totalCount) {
+            return (new address[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        orgs = new address[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            orgs[i] = allUserOrgs[offset + i];
+        }
+        return (orgs, totalCount);
     }
 
-    function getMyOrganisations() external view returns (address[] memory) {
-        // This function retrieves the list of organization IDs associated with the caller.
-
-        return s_userToOrganisations[msg.sender];
+    function getMyOrganisations(uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory orgs, uint256 totalCount)
+    {
+        return this.getUserOrganisations(msg.sender, offset, limit);
     }
 
-    function getAllOrganisations() external view returns (address[] memory) {
-        // This function retrieves the list of all organization addresses.
-
-        return s_allOrganisations;
+    function getAllOrganisations(uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory orgs, uint256 totalCount)
+    {
+        totalCount = s_allOrganisations.length;
+        if (offset >= totalCount) {
+            return (new address[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        orgs = new address[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            orgs[i] = s_allOrganisations[offset + i];
+        }
+        return (orgs, totalCount);
     }
 
     function getOrganisationCount() external view returns (uint256) {
@@ -64,10 +100,38 @@ contract OrganisationFactory is Ownable {
     }
 
     function addMemberToOrganisation(address _member) external {
-        // This function adds a member to an organization.
+        // This function adds a member to an organization (called by Organisation contract)
         if (!s_isOrganisation[msg.sender]) revert InvalidOrganisation();
         if (msg.sender == address(0)) revert OrganisationDoesNotExist();
         s_userToOrganisations[_member].push(msg.sender);
+
+        Organisation org = Organisation(msg.sender);
+        if (org.checkOwnership(_member)) {
+            s_userToOrganisationsAsOwner[_member].push(msg.sender);
+        } else {
+            s_userToOrganisationsAsMember[_member].push(msg.sender);
+        }
+    }
+
+    function promoteToOwner(address _member) external {
+        // This function updates the role mapping when a member becomes an owner
+        if (!s_isOrganisation[msg.sender]) revert InvalidOrganisation();
+
+        // Remove from member-only array
+        address[] storage memberOrgs = s_userToOrganisationsAsMember[_member];
+        for (uint256 i; i < memberOrgs.length;) {
+            if (memberOrgs[i] == msg.sender) {
+                memberOrgs[i] = memberOrgs[memberOrgs.length - 1];
+                memberOrgs.pop();
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Add to owner array
+        s_userToOrganisationsAsOwner[_member].push(msg.sender);
     }
 
     function getOrganisationInfo(address _organisationAddress)
@@ -84,18 +148,30 @@ contract OrganisationFactory is Ownable {
         )
     {
         // This function retrieves detailed information about an organization based on its ID.
-        if (!s_isOrganisation[_organisationAddress]) revert OrganisationDoesNotExist();
+        if (!s_isOrganisation[_organisationAddress]) {
+            revert OrganisationDoesNotExist();
+        }
         Organisation org = Organisation(_organisationAddress);
         return org.getOrganisationInfo();
     }
 
-    function getAllOrganisationDetails() external view returns (OrganisationDetails[] memory organizationDetails) {
-        // This function retrieves detailed information about all organizations.
-
-        uint256 totalOrgs = s_allOrganisations.length;
-        organizationDetails = new OrganisationDetails[](totalOrgs);
-        for (uint256 i = 0; i < totalOrgs; i++) {
-            address organisationAddress = s_allOrganisations[i];
+    function getAllOrganisationDetails(uint256 offset, uint256 limit)
+        external
+        view
+        returns (OrganisationDetails[] memory organizationDetails, uint256 totalCount)
+    {
+        totalCount = s_allOrganisations.length;
+        if (offset >= totalCount) {
+            return (new OrganisationDetails[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        organizationDetails = new OrganisationDetails[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            address organisationAddress = s_allOrganisations[offset + i];
             Organisation org = Organisation(organisationAddress);
             try org.getOrganisationInfo() returns (
                 address orgAddress,
@@ -134,7 +210,7 @@ contract OrganisationFactory is Ownable {
             }
         }
 
-        return organizationDetails;
+        return (organizationDetails, totalCount);
     }
 
     function updateTreeNFTContract(address _newTreeNFTContract) external onlyOwner {
@@ -147,7 +223,9 @@ contract OrganisationFactory is Ownable {
     function removeOrganisation(address _organisationAddress) external onlyOwner {
         // This function allows the owner to remove an organization from the factory.
 
-        if (s_isOrganisation[_organisationAddress] == false) revert OrganisationDoesNotExist();
+        if (s_isOrganisation[_organisationAddress] == false) {
+            revert OrganisationDoesNotExist();
+        }
         for (uint256 i = 0; i < s_allOrganisations.length; i++) {
             if (s_allOrganisations[i] == _organisationAddress) {
                 s_allOrganisations[i] = s_allOrganisations[s_allOrganisations.length - 1];
@@ -160,5 +238,163 @@ contract OrganisationFactory is Ownable {
     function getTreeNFTContract() external view returns (address) {
         // This function retrieves the address of the Tree NFT contract.
         return treeNFTContract;
+    }
+
+    function getUserOrganisationsAsOwner(address _user, uint256 offset, uint256 limit)
+        external
+        view
+        returns (OrganisationDetails[] memory orgs, uint256 totalCount)
+    {
+        // This function retrieves paginated organizations where the user is an owner/admin
+
+        address[] memory ownerOrgs = s_userToOrganisationsAsOwner[_user];
+        totalCount = ownerOrgs.length;
+
+        if (offset >= totalCount || limit == 0) {
+            return (new OrganisationDetails[](0), totalCount);
+        }
+
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+
+        orgs = new OrganisationDetails[](resultLength);
+
+        for (uint256 i; i < resultLength;) {
+            address orgAddr = ownerOrgs[offset + i];
+            Organisation org = Organisation(orgAddr);
+
+            try org.getOrganisationInfo() returns (
+                address orgAddress,
+                string memory name,
+                string memory description,
+                string memory photoIpfsHash,
+                address[] memory owners,
+                address[] memory members,
+                uint256 timeOfCreation
+            ) {
+                orgs[i] = OrganisationDetails({
+                    contractAddress: orgAddress,
+                    name: name,
+                    description: description,
+                    organisationPhoto: photoIpfsHash,
+                    owners: owners,
+                    members: members,
+                    ownerCount: owners.length,
+                    memberCount: members.length,
+                    isActive: s_isOrganisation[orgAddress],
+                    timeOfCreation: timeOfCreation
+                });
+            } catch {
+                orgs[i] = OrganisationDetails({
+                    contractAddress: orgAddr,
+                    name: "ERROR: Unable to fetch",
+                    description: "ERROR: Contract call failed",
+                    organisationPhoto: "",
+                    owners: new address[](0),
+                    members: new address[](0),
+                    ownerCount: 0,
+                    memberCount: 0,
+                    isActive: false,
+                    timeOfCreation: 0
+                });
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        return (orgs, totalCount);
+    }
+
+    function getUserOrganisationsAsMember(address _user, uint256 offset, uint256 limit)
+        external
+        view
+        returns (OrganisationDetails[] memory orgs, uint256 totalCount)
+    {
+        // This function retrieves paginated organizations where the user is a member (but not an owner)
+
+        address[] memory memberOrgs = s_userToOrganisationsAsMember[_user];
+        totalCount = memberOrgs.length;
+
+        if (offset >= totalCount || limit == 0) {
+            return (new OrganisationDetails[](0), totalCount);
+        }
+
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+
+        orgs = new OrganisationDetails[](resultLength);
+
+        for (uint256 i; i < resultLength;) {
+            address orgAddr = memberOrgs[offset + i];
+            Organisation org = Organisation(orgAddr);
+
+            try org.getOrganisationInfo() returns (
+                address orgAddress,
+                string memory name,
+                string memory description,
+                string memory photoIpfsHash,
+                address[] memory owners,
+                address[] memory members,
+                uint256 timeOfCreation
+            ) {
+                orgs[i] = OrganisationDetails({
+                    contractAddress: orgAddress,
+                    name: name,
+                    description: description,
+                    organisationPhoto: photoIpfsHash,
+                    owners: owners,
+                    members: members,
+                    ownerCount: owners.length,
+                    memberCount: members.length,
+                    isActive: s_isOrganisation[orgAddress],
+                    timeOfCreation: timeOfCreation
+                });
+            } catch {
+                orgs[i] = OrganisationDetails({
+                    contractAddress: orgAddr,
+                    name: "ERROR: Unable to fetch",
+                    description: "ERROR: Contract call failed",
+                    organisationPhoto: "",
+                    owners: new address[](0),
+                    members: new address[](0),
+                    ownerCount: 0,
+                    memberCount: 0,
+                    isActive: false,
+                    timeOfCreation: 0
+                });
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        return (orgs, totalCount);
+    }
+
+    function getMyOrganisationsAsOwner(uint256 offset, uint256 limit)
+        external
+        view
+        returns (OrganisationDetails[] memory orgs, uint256 totalCount)
+    {
+        // This function retrieves paginated organizations where the caller is an owner/admin
+
+        return this.getUserOrganisationsAsOwner(msg.sender, offset, limit);
+    }
+
+    function getMyOrganisationsAsMember(uint256 offset, uint256 limit)
+        external
+        view
+        returns (OrganisationDetails[] memory orgs, uint256 totalCount)
+    {
+        // This function retrieves paginated organizations where the caller is a member (but not an owner)
+
+        return this.getUserOrganisationsAsMember(msg.sender, offset, limit);
     }
 }

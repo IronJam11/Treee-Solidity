@@ -169,28 +169,45 @@ contract Organisation {
     {
         // This function returns a specific verification request by its ID
 
-        if (verificationID >= s_verificationCounter && verificationID < 0) revert InvalidVerificationId();
+        if (verificationID >= s_verificationCounter && verificationID < 0) {
+            revert InvalidVerificationId();
+        }
         return s_verificationIDtoVerification[verificationID];
     }
 
-    function getVerificationRequests(uint256 status) external view returns (OrganisationVerificationRequest[] memory) {
-        // First pass: count matching requests
-
+    function getVerificationRequests(uint256 status, uint256 offset, uint256 limit)
+        external
+        view
+        returns (OrganisationVerificationRequest[] memory requests, uint256 totalCount)
+    {
         uint256 matchCount = 0;
         for (uint256 i = 0; i < s_verificationCounter; i++) {
             if (s_verificationIDtoVerification[i].status == status) {
                 matchCount++;
             }
         }
-        OrganisationVerificationRequest[] memory requests = new OrganisationVerificationRequest[](matchCount);
-        uint256 currentIndex = 0;
-        for (uint256 i = 0; i < s_verificationCounter; i++) {
+        totalCount = matchCount;
+        if (offset >= totalCount) {
+            return (new OrganisationVerificationRequest[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        requests = new OrganisationVerificationRequest[](resultLength);
+        uint256 currentMatch = 0;
+        uint256 resultIndex = 0;
+        for (uint256 i = 0; i < s_verificationCounter && resultIndex < resultLength; i++) {
             if (s_verificationIDtoVerification[i].status == status) {
-                requests[currentIndex] = s_verificationIDtoVerification[i];
-                currentIndex++;
+                if (currentMatch >= offset) {
+                    requests[resultIndex] = s_verificationIDtoVerification[i];
+                    resultIndex++;
+                }
+                currentMatch++;
             }
         }
-        return requests;
+        return (requests, totalCount);
     }
 
     function getVerificationRequestsByStatus(uint256 status, uint256 offset, uint256 limit)
@@ -307,29 +324,45 @@ contract Organisation {
     function getTreePlantingProposal(uint256 proposalID) external view returns (TreePlantingProposal memory) {
         // This function returns a tree planting proposal
 
-        if (proposalID >= s_treePlantingProposalCounter) revert InvalidProposalId();
+        if (proposalID >= s_treePlantingProposalCounter) {
+            revert InvalidProposalId();
+        }
         return s_treePlantingProposalIDtoTreePlantingProposal[proposalID];
     }
 
-    function getTreePlantingProposals(uint256 status) external view returns (TreePlantingProposal[] memory) {
-        // This function returns all tree planting proposals
-
+    function getTreePlantingProposals(uint256 status, uint256 offset, uint256 limit)
+        external
+        view
+        returns (TreePlantingProposal[] memory proposals, uint256 totalCount)
+    {
         uint256 matchCount = 0;
         for (uint256 i = 0; i < s_treePlantingProposalCounter; i++) {
             if (s_treePlantingProposalIDtoTreePlantingProposal[i].status == status) {
                 matchCount++;
             }
         }
-        TreePlantingProposal[] memory proposals = new TreePlantingProposal[](matchCount);
-        uint256 currentIndex = 0;
-        for (uint256 i = 0; i < s_treePlantingProposalCounter; i++) {
+        totalCount = matchCount;
+        if (offset >= totalCount) {
+            return (new TreePlantingProposal[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        proposals = new TreePlantingProposal[](resultLength);
+        uint256 currentMatch = 0;
+        uint256 resultIndex = 0;
+        for (uint256 i = 0; i < s_treePlantingProposalCounter && resultIndex < resultLength; i++) {
             if (s_treePlantingProposalIDtoTreePlantingProposal[i].status == status) {
-                proposals[currentIndex] = s_treePlantingProposalIDtoTreePlantingProposal[i];
-                currentIndex++;
+                if (currentMatch >= offset) {
+                    proposals[resultIndex] = s_treePlantingProposalIDtoTreePlantingProposal[i];
+                    resultIndex++;
+                }
+                currentMatch++;
             }
         }
-
-        return proposals;
+        return (proposals, totalCount);
     }
 
     function getTreePlantingProposalsByStatus(uint256 status, uint256 offset, uint256 limit)
@@ -377,7 +410,9 @@ contract Organisation {
     function voteOnTreePlantingProposal(uint256 proposalID, uint256 vote) external onlyOwner {
         // This function allows users to vote on a tree planting proposal
 
-        if (proposalID >= s_treePlantingProposalCounter) revert InvalidProposalId();
+        if (proposalID >= s_treePlantingProposalCounter) {
+            revert InvalidProposalId();
+        }
 
         TreePlantingProposal storage proposal = s_treePlantingProposalIDtoTreePlantingProposal[proposalID];
         if (proposal.status != 0) revert AlreadyProcessed();
@@ -423,6 +458,7 @@ contract Organisation {
         if (!checkMembership(newOwner)) revert NotOrganisationMember();
         if (checkOwnership(newOwner)) revert AlreadyOwner();
         owners.push(newOwner);
+        organisationFactoryContract.promoteToOwner(newOwner);
     }
 
     function checkOwnership(address user) public view returns (bool) {
@@ -447,16 +483,46 @@ contract Organisation {
         return false;
     }
 
-    function getMembers() external view returns (address[] memory) {
-        // This function returns the list of members in the organisation
-
-        return members;
+    function getMembers(uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory memberList, uint256 totalCount)
+    {
+        totalCount = members.length;
+        if (offset >= totalCount) {
+            return (new address[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        memberList = new address[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            memberList[i] = members[offset + i];
+        }
+        return (memberList, totalCount);
     }
 
-    function getOwners() external view returns (address[] memory) {
-        // This function returns the list of owners in the organisation
-
-        return owners;
+    function getOwners(uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory ownerList, uint256 totalCount)
+    {
+        totalCount = owners.length;
+        if (offset >= totalCount) {
+            return (new address[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        ownerList = new address[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            ownerList[i] = owners[offset + i];
+        }
+        return (ownerList, totalCount);
     }
 
     function getMemberCount() external view returns (uint256) {
