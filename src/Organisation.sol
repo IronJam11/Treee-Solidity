@@ -89,6 +89,7 @@ contract Organisation {
         if (ownerCount == 1 && owners[0] == msg.sender) {
             revert NeedAnotherOwner();
         }
+        bool wasOwner = checkOwnership(msg.sender);
         bool found = false;
         for (uint256 i = 0; i < members.length; i++) {
             if (members[i] == msg.sender) {
@@ -106,6 +107,7 @@ contract Organisation {
                 break;
             }
         }
+        organisationFactoryContract.removeMemberFromOrganisation(msg.sender, wasOwner);
         emit UserRemovedFromOrganisation(msg.sender, address(this), block.timestamp, msg.sender);
     }
 
@@ -114,6 +116,7 @@ contract Organisation {
 
         if (!checkMembership(msg.sender)) revert NotOrganisationMember();
         if (!checkMembership(member)) revert NotOrganisationMember();
+        bool wasOwner = checkOwnership(member);
         for (uint256 i = 0; i < members.length; i++) {
             if (members[i] == member) {
                 members[i] = members[members.length - 1];
@@ -128,6 +131,7 @@ contract Organisation {
                 break;
             }
         }
+        organisationFactoryContract.removeMemberFromOrganisation(member, wasOwner);
         emit UserRemovedFromOrganisation(member, address(this), block.timestamp, msg.sender);
     }
 
@@ -169,7 +173,7 @@ contract Organisation {
     {
         // This function returns a specific verification request by its ID
 
-        if (verificationID >= s_verificationCounter && verificationID < 0) {
+        if (verificationID >= s_verificationCounter) {
             revert InvalidVerificationId();
         }
         return s_verificationIDtoVerification[verificationID];

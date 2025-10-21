@@ -134,6 +134,51 @@ contract OrganisationFactory is Ownable {
         s_userToOrganisationsAsOwner[_member].push(msg.sender);
     }
 
+    function removeMemberFromOrganisation(address _member, bool _wasOwner) external {
+        // This function removes a member from an organization (called by Organisation contract)
+        if (!s_isOrganisation[msg.sender]) revert InvalidOrganisation();
+
+        // Remove from s_userToOrganisations
+        address[] storage userOrgs = s_userToOrganisations[_member];
+        for (uint256 i; i < userOrgs.length;) {
+            if (userOrgs[i] == msg.sender) {
+                userOrgs[i] = userOrgs[userOrgs.length - 1];
+                userOrgs.pop();
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Remove from role-specific mapping
+        if (_wasOwner) {
+            address[] storage ownerOrgs = s_userToOrganisationsAsOwner[_member];
+            for (uint256 i; i < ownerOrgs.length;) {
+                if (ownerOrgs[i] == msg.sender) {
+                    ownerOrgs[i] = ownerOrgs[ownerOrgs.length - 1];
+                    ownerOrgs.pop();
+                    break;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+        } else {
+            address[] storage memberOrgs = s_userToOrganisationsAsMember[_member];
+            for (uint256 i; i < memberOrgs.length;) {
+                if (memberOrgs[i] == msg.sender) {
+                    memberOrgs[i] = memberOrgs[memberOrgs.length - 1];
+                    memberOrgs.pop();
+                    break;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+    }
+
     function getOrganisationInfo(address _organisationAddress)
         external
         view
@@ -226,6 +271,7 @@ contract OrganisationFactory is Ownable {
         if (s_isOrganisation[_organisationAddress] == false) {
             revert OrganisationDoesNotExist();
         }
+        s_isOrganisation[_organisationAddress] = false;
         for (uint256 i = 0; i < s_allOrganisations.length; i++) {
             if (s_allOrganisations[i] == _organisationAddress) {
                 s_allOrganisations[i] = s_allOrganisations[s_allOrganisations.length - 1];
