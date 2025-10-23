@@ -16,6 +16,7 @@ contract OrganisationFactory is Ownable {
     mapping(address => bool) private s_isOrganisation;
 
     address[] private s_allOrganisations;
+    uint256 public paginationLimit = 50;
 
     constructor(address _treeNFTContract) Ownable(msg.sender) {
         treeNFTContract = _treeNFTContract;
@@ -47,6 +48,7 @@ contract OrganisationFactory is Ownable {
         view
         returns (address[] memory orgs, uint256 totalCount)
     {
+        if (limit > paginationLimit) revert PaginationLimitExceeded();
         address[] memory allUserOrgs = s_userToOrganisations[_user];
         totalCount = allUserOrgs.length;
         if (offset >= totalCount) {
@@ -69,6 +71,7 @@ contract OrganisationFactory is Ownable {
         view
         returns (address[] memory orgs, uint256 totalCount)
     {
+        if (limit > paginationLimit) revert PaginationLimitExceeded();
         return this.getUserOrganisations(msg.sender, offset, limit);
     }
 
@@ -77,6 +80,7 @@ contract OrganisationFactory is Ownable {
         view
         returns (address[] memory orgs, uint256 totalCount)
     {
+        if (limit > paginationLimit) revert PaginationLimitExceeded();
         totalCount = s_allOrganisations.length;
         if (offset >= totalCount) {
             return (new address[](0), totalCount);
@@ -205,6 +209,7 @@ contract OrganisationFactory is Ownable {
         view
         returns (OrganisationDetails[] memory organizationDetails, uint256 totalCount)
     {
+        if (limit > paginationLimit) revert PaginationLimitExceeded();
         totalCount = s_allOrganisations.length;
         if (offset >= totalCount) {
             return (new OrganisationDetails[](0), totalCount);
@@ -258,13 +263,6 @@ contract OrganisationFactory is Ownable {
         return (organizationDetails, totalCount);
     }
 
-    function updateTreeNFTContract(address _newTreeNFTContract) external onlyOwner {
-        // This function updates the address of the Tree NFT contract.
-
-        if (_newTreeNFTContract == address(0)) revert InvalidInput();
-        treeNFTContract = _newTreeNFTContract;
-    }
-
     function removeOrganisation(address _organisationAddress) external onlyOwner {
         // This function allows the owner to remove an organization from the factory.
 
@@ -293,6 +291,7 @@ contract OrganisationFactory is Ownable {
     {
         // This function retrieves paginated organizations where the user is an owner/admin
 
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         address[] memory ownerOrgs = s_userToOrganisationsAsOwner[_user];
         totalCount = ownerOrgs.length;
 
@@ -362,6 +361,7 @@ contract OrganisationFactory is Ownable {
     {
         // This function retrieves paginated organizations where the user is a member (but not an owner)
 
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         address[] memory memberOrgs = s_userToOrganisationsAsMember[_user];
         totalCount = memberOrgs.length;
 
@@ -430,7 +430,7 @@ contract OrganisationFactory is Ownable {
         returns (OrganisationDetails[] memory orgs, uint256 totalCount)
     {
         // This function retrieves paginated organizations where the caller is an owner/admin
-
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         return this.getUserOrganisationsAsOwner(msg.sender, offset, limit);
     }
 
@@ -441,6 +441,7 @@ contract OrganisationFactory is Ownable {
     {
         // This function retrieves paginated organizations where the caller is a member (but not an owner)
 
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         return this.getUserOrganisationsAsMember(msg.sender, offset, limit);
     }
 }

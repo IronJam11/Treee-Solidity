@@ -132,9 +132,9 @@ contract TreeNftVerificationTest is Test {
         vm.prank(planter);
         treeNft.removeVerification(0, verifier1);
         assertTrue(treeNft.isVerified(0, verifier1));
-        (TreeNftVerification[] memory verifications,,) = treeNft.getTreeNftVerifiersPaginated(0, 0, 100);
+        (TreeNftVerification[] memory verifications,,) = treeNft.getTreeNftVerifiersPaginated(0, 0, 50);
         assertEq(verifications.length, 0);
-        (Tree[] memory verifiedTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 100);
+        (Tree[] memory verifiedTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 50);
         assertEq(verifiedTrees.length, 0);
         assertEq(planterToken.balanceOf(planter), 0);
     }
@@ -212,11 +212,11 @@ contract TreeNftVerificationTest is Test {
         treeNft.verify(1, proofs, "verified tree 1");
         vm.stopPrank();
 
-        (Tree[] memory verifiedTreesBefore,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 100);
+        (Tree[] memory verifiedTreesBefore,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 50);
         assertEq(verifiedTreesBefore.length, 2);
         vm.prank(planter);
         treeNft.removeVerification(0, verifier1);
-        (Tree[] memory verifiedTreesAfter,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 100);
+        (Tree[] memory verifiedTreesAfter,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 50);
         assertEq(verifiedTreesAfter.length, 1);
         assertEq(verifiedTreesAfter[0].id, 1);
     }
@@ -329,7 +329,7 @@ contract TreeNftVerificationTest is Test {
         vm.prank(verifier1);
         treeNft.verify(1, proofs, "verified tree 1");
 
-        (Tree[] memory verifiedTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 100);
+        (Tree[] memory verifiedTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 50);
 
         assertEq(verifiedTrees.length, 2);
         assertEq(verifiedTrees[0].id, 0);
@@ -426,12 +426,12 @@ contract TreeNftVerificationTest is Test {
         treeNft.verify(2, proofs, "verified tree 2");
         vm.stopPrank();
 
-        (Tree[] memory verifiedTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 100);
+        (Tree[] memory verifiedTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 50);
         assertEq(verifiedTrees.length, 3);
 
         vm.prank(planter);
         treeNft.removeVerification(1, verifier1);
-        (Tree[] memory remainingTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 100);
+        (Tree[] memory remainingTrees,) = treeNft.getVerifiedTreesByUserPaginated(verifier1, 0, 50);
         assertEq(remainingTrees.length, 2);
 
         bool hasTree0 = false;

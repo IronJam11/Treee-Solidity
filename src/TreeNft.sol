@@ -22,6 +22,7 @@ contract TreeNft is ERC721, Ownable {
     uint256 private s_deathCounter;
     uint256 private s_treeNftVerificationCounter;
     uint256 private s_userCounter;
+    uint256 public constant maxLimitForPagination = 50;
 
     uint256 public minimumTimeToMarkTreeDead = 365 days;
     CareToken public careTokenContract;
@@ -129,6 +130,8 @@ contract TreeNft is ERC721, Ownable {
 
     function getAllNFTs(uint256 offset, uint256 limit) public view returns (Tree[] memory trees, uint256 totalCount) {
         totalCount = s_treeTokenCounter;
+        if (limit > maxLimitForPagination) revert MaximumLimitRequestExceeded();
+
         if (offset >= totalCount) {
             return (new Tree[](0), totalCount);
         }
@@ -401,6 +404,7 @@ contract TreeNft is ERC721, Ownable {
     {
         // Get the total number of trees verified by this verifier
 
+        if (limit > maxLimitForPagination) revert MaximumLimitRequestExceeded();
         uint256[] memory verifiedTokens = s_verifierToTreeTokenIDs[verifier];
         totalCount = verifiedTokens.length;
         if (offset >= totalCount) {

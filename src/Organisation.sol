@@ -68,7 +68,7 @@ contract Organisation {
         timeOfCreation = block.timestamp;
         treeNFTContract = TreeNft(_treeNFTContractAddress);
         organisationFactoryContract = OrganisationFactory(_factoryAddress);
-        paginationLimit = 100;
+        paginationLimit = 50;
     }
 
     function addMember(address user) external onlyOwner {
@@ -184,6 +184,7 @@ contract Organisation {
         view
         returns (OrganisationVerificationRequest[] memory requests, uint256 totalCount)
     {
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         uint256 matchCount = 0;
         for (uint256 i = 0; i < s_verificationCounter; i++) {
             if (s_verificationIDtoVerification[i].status == status) {
@@ -339,6 +340,7 @@ contract Organisation {
         view
         returns (TreePlantingProposal[] memory proposals, uint256 totalCount)
     {
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         uint256 matchCount = 0;
         for (uint256 i = 0; i < s_treePlantingProposalCounter; i++) {
             if (s_treePlantingProposalIDtoTreePlantingProposal[i].status == status) {
@@ -377,7 +379,7 @@ contract Organisation {
         // This function returns tree planting proposals by status
 
         if (limit <= 0) revert InvalidInput();
-        if (limit > paginationLimit) revert PaginationLimitExceeded();
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         uint256 matchCount = 0;
         for (uint256 i = 0; i < s_treePlantingProposalCounter; i++) {
             if (s_treePlantingProposalIDtoTreePlantingProposal[i].status == status) {
@@ -513,6 +515,9 @@ contract Organisation {
         view
         returns (address[] memory ownerList, uint256 totalCount)
     {
+        // This function returns the list of owners of the organisation
+
+        if (limit > paginationLimit) revert MaximumLimitRequestExceeded();
         totalCount = owners.length;
         if (offset >= totalCount) {
             return (new address[](0), totalCount);
