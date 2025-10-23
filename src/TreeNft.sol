@@ -1,87 +1,477 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC721} from "../lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
+import {Base64} from "../lib/openzeppelin-contracts/contracts/utils/Base64.sol";
+import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
 import "./utils/structs.sol";
 import "./utils/errors.sol";
 
+import "./Organisation.sol";
+import "./OrganisationFactory.sol";
+
+import "./token-contracts/CareToken.sol";
+import "./token-contracts/LegacyToken.sol";
+import "./token-contracts/PlanterToken.sol";
+
 contract TreeNft is ERC721, Ownable {
-    uint256 private s_tokenCounter;
+    uint256 private s_treeTokenCounter;
     uint256 private s_organisationCounter;
     uint256 private s_deathCounter;
+    uint256 private s_treeNftVerificationCounter;
+    uint256 private s_userCounter;
+
+    uint256 public minimumTimeToMarkTreeDead = 365 days;
+    CareToken public careTokenContract;
+    LegacyToken public legacyToken;
+
     mapping(uint256 => Tree) private s_tokenIDtoTree;
+    mapping(uint256 => address) private s_tokenIDtoVerificationContracts;
     mapping(uint256 => address[]) private s_tokenIDtoVerifiers;
     mapping(address => uint256[]) private s_userToNFTs;
+    mapping(address => address) public s_userToPlanterTokenAddress;
+    mapping(address => address[]) public s_userToVerifierTokenAddresses;
+
     mapping(uint256 => mapping(address => bool)) private s_tokenIDtoUserVerification;
-    mapping(address => uint256[]) private s_verifierToTokenIDs;
+    mapping(address => uint256[]) private s_verifierToTreeTokenIDs;
+    mapping(uint256 => TreeNftVerification) private s_tokenIDtoTreeNftVerfication;
+    mapping(uint256 => uint256[]) private s_treeTokenIdToVerifications;
+    mapping(address => TreeNftVerification[]) private s_userToVerifications;
 
-    constructor() Ownable(msg.sender) ERC721("TreeNFT", "TREE") {
-        s_tokenCounter = 0;
+    mapping(address => User) s_addressToUser;
+
+    constructor(address _careTokenContract, address _legacyTokenContract)
+        Ownable(msg.sender)
+        ERC721("TreeNFT", "TREE")
+    {
+        s_treeTokenCounter = 0;
+        s_organisationCounter = 0;
+        s_deathCounter = 0;
+        s_treeNftVerificationCounter = 0;
+        s_userCounter = 0;
+
+        careTokenContract = CareToken(_careTokenContract);
+        legacyToken = LegacyToken(_legacyTokenContract);
     }
 
-    function _exists(uint256 tokenId) internal view returns (bool) {
-        return tokenId < s_tokenCounter && tokenId >= 0;
-    }
+    event VerificationRemoved(uint256 indexed verificationId, uint256 indexed treeNftId, address indexed verifier);
 
     function mintNft(
         uint256 latitude,
         uint256 longitude,
         string memory species,
         string memory imageUri,
-        string memory qrIpfsHash,
+        string memory qrPhoto,
+        string memory metadata,
         string memory geoHash,
-        string[] memory initialPhotos, // Allow passing initial photos during minting
-        address organisationAddress
+        string[] memory initialPhotos,
+        uint256 numberOfTrees
     ) public {
-        // This function mints a new NFT for the user
+        if (latitude > 180 * 1e6) revert InvalidCoordinates();
+        if (longitude > 360 * 1e6) revert InvalidCoordinates();
 
-        uint256 tokenId = s_tokenCounter;
-        s_tokenCounter++;
-        s_userToNFTs[msg.sender].push(tokenId);
+        uint256 tokenId = s_treeTokenCounter;
+        s_treeTokenCounter++;
+
         _mint(msg.sender, tokenId);
         address[] memory ancestors = new address[](1);
         ancestors[0] = msg.sender;
-        Verification[] memory emptyVerifications = new Verification[](0);
+
         s_tokenIDtoTree[tokenId] = Tree(
+            tokenId,
             latitude,
             longitude,
             block.timestamp,
             type(uint256).max,
             species,
             imageUri,
-            qrIpfsHash,
+            qrPhoto,
+            metadata,
             initialPhotos,
             geoHash,
             ancestors,
-            organisationAddress,
-            emptyVerifications,
             block.timestamp,
-            0
+            0,
+            numberOfTrees
         );
+
+        s_userToNFTs[msg.sender].push(tokenId);
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        if (!_exists(tokenId)) revert InvalidTreeID();
+        Tree memory tree = s_tokenIDtoTree[tokenId];
+
+        string memory json = string(
+            abi.encodePacked(
+                '{"name":"TreeNFT #',
+                Strings.toString(tokenId),
+                '","description":"Tree planted at coordinates ',
+                Strings.toString(tree.latitude),
+                ",",
+                Strings.toString(tree.longitude),
+                '","image":"',
+                tree.imageUri,
+                '","attributes":[{"trait_type":"Latitude","value":',
+                Strings.toString(tree.latitude),
+                '},{"trait_type":"Longitude","value":',
+                Strings.toString(tree.longitude),
+                '},{"trait_type":"Planting Date","value":',
+                Strings.toString(tree.planting),
+                "}]}"
+            )
+        );
+
+        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
+    }
+
+    function getAllNFTs() public view returns (Tree[] memory) {
+        // This function retrieves all NFTs in the contract
+
+        Tree[] memory allTrees = new Tree[](s_treeTokenCounter);
+        for (uint256 i = 0; i < allTrees.length; i++) {
+            allTrees[i] = s_tokenIDtoTree[i];
+        }
+        return allTrees;
+    }
+
+    function getRecentTreesPaginated(uint256 offset, uint256 limit)
+        external
+        view
+        returns (Tree[] memory paginatedTrees, uint256 totalCount, bool hasMore)
+    {
+        // This function retrieves recent trees with pagination
+
+        if (limit > 50) revert PaginationLimitExceeded();
+        uint256 totalTrees = s_treeTokenCounter;
+        if (offset >= totalTrees) return (new Tree[](0), totalTrees, false);
+        uint256 available = totalTrees - offset;
+        uint256 toReturn = available < limit ? available : limit;
+        Tree[] memory result = new Tree[](toReturn);
+        for (uint256 i = 0; i < toReturn; i++) {
+            uint256 treeIndex = totalTrees - 1 - offset - i;
+            result[i] = s_tokenIDtoTree[treeIndex];
+        }
+        bool hasMoreTrees = offset + toReturn < totalTrees;
+        return (result, totalTrees, hasMoreTrees);
+    }
+
+    function getNFTsByUser(address user) public view returns (Tree[] memory) {
+        // This function retrieves all NFTs owned by a specific user
+
+        uint256[] memory userNFTs = s_userToNFTs[user];
+        Tree[] memory userTrees = new Tree[](userNFTs.length);
+        for (uint256 i = 0; i < userNFTs.length; i++) {
+            uint256 tokenId = userNFTs[i];
+            userTrees[i] = s_tokenIDtoTree[tokenId];
+        }
+        return userTrees;
+    }
+
+    function getNFTsByUserPaginated(address user, uint256 offset, uint256 limit)
+        public
+        view
+        returns (Tree[] memory trees, uint256 totalCount)
+    {
+        // Get the total number of NFTs for this user
+
+        uint256[] memory userNFTs = s_userToNFTs[user];
+        totalCount = userNFTs.length;
+
+        if (offset >= totalCount) {
+            return (new Tree[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        trees = new Tree[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            uint256 tokenId = userNFTs[offset + i];
+            trees[i] = s_tokenIDtoTree[tokenId];
+        }
+
+        return (trees, totalCount);
+    }
+
+    function getTreeDetailsbyID(uint256 tokenId) public view returns (Tree memory) {
+        // This function retrieves details of a specific tree NFT by its ID
+
+        if (!_exists(tokenId)) revert InvalidTreeID();
+        return s_tokenIDtoTree[tokenId];
+    }
+
+    function verify(uint256 _tokenId, string[] memory _proofHashes, string memory _description) public {
+        // This function allows a verifier to verify a tree
+
+        if (!_exists(_tokenId)) revert InvalidTreeID();
+        address treeOwner = ownerOf(_tokenId);
+        Tree memory tree = s_tokenIDtoTree[_tokenId];
+        if (msg.sender == treeOwner) revert CannotVerifyOwnTree();
+
+        if (s_tokenIDtoUserVerification[_tokenId][msg.sender]) {
+            revert AlreadyVerified();
+        }
+        if (s_userToPlanterTokenAddress[msg.sender] == address(0)) {
+            PlanterToken newPlanterToken = new PlanterToken(msg.sender);
+            s_userToPlanterTokenAddress[msg.sender] = address(newPlanterToken);
+        }
+        address planterTokenContract = s_userToPlanterTokenAddress[msg.sender];
+        PlanterToken planterToken = PlanterToken(planterTokenContract);
+
+        if (!isVerified(_tokenId, msg.sender)) {
+            TreeNftVerification memory treeVerification = TreeNftVerification(
+                msg.sender, block.timestamp, _proofHashes, _description, false, _tokenId, planterTokenContract
+            );
+            s_tokenIDtoUserVerification[_tokenId][msg.sender] = true;
+            s_tokenIDtoVerifiers[_tokenId].push(msg.sender);
+            s_verifierToTreeTokenIDs[msg.sender].push(_tokenId);
+            s_tokenIDtoTreeNftVerfication[s_treeNftVerificationCounter] = treeVerification;
+            s_treeTokenIdToVerifications[_tokenId].push(s_treeNftVerificationCounter);
+            s_treeNftVerificationCounter++;
+            planterToken.mint(ownerOf(_tokenId), tree.numberOfTrees * 1e18);
+            s_userToVerifierTokenAddresses[ownerOf(_tokenId)].push(planterTokenContract);
+            s_userToVerifications[msg.sender].push(treeVerification);
+        }
+    }
+
+    function removeVerification(uint256 _tokenId, address verifier) public {
+        // This function facilitates the owner of the tree nft to remove fraudulent verifiers
+
+        if (msg.sender != ownerOf(_tokenId)) revert NotTreeOwner();
+        if (!s_tokenIDtoUserVerification[_tokenId][verifier]) {
+            revert VerificationNotFound();
+        }
+        Tree memory tree = s_tokenIDtoTree[_tokenId];
+        address treeOwner = ownerOf(_tokenId);
+
+        s_tokenIDtoUserVerification[_tokenId][verifier] = false;
+        address[] storage verifiers = s_tokenIDtoVerifiers[_tokenId];
+        for (uint256 i = 0; i < verifiers.length; i++) {
+            if (verifiers[i] == verifier) {
+                verifiers[i] = verifiers[verifiers.length - 1];
+                verifiers.pop();
+                break;
+            }
+        }
+        uint256[] storage verifiedTrees = s_verifierToTreeTokenIDs[verifier];
+        for (uint256 i = 0; i < verifiedTrees.length; i++) {
+            if (verifiedTrees[i] == _tokenId) {
+                verifiedTrees[i] = verifiedTrees[verifiedTrees.length - 1];
+                verifiedTrees.pop();
+                break;
+            }
+        }
+        uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
+        for (uint256 i = 0; i < verificationIds.length; i++) {
+            TreeNftVerification storage treeNftVerification = s_tokenIDtoTreeNftVerfication[verificationIds[i]];
+            if (treeNftVerification.verifier == verifier && !treeNftVerification.isHidden) {
+                treeNftVerification.isHidden = true;
+
+                User storage user = s_addressToUser[verifier];
+                user.verificationsRevoked++;
+                address planterTokenAddr = s_userToPlanterTokenAddress[verifier];
+                if (planterTokenAddr != address(0)) {
+                    PlanterToken planterToken = PlanterToken(planterTokenAddr);
+                    uint256 tokensToReturn = tree.numberOfTrees * 1e18;
+                    if (planterToken.balanceOf(treeOwner) >= tokensToReturn) {
+                        planterToken.burnFrom(treeOwner, tokensToReturn);
+                        address[] storage verifierTokenAddrs = s_userToVerifierTokenAddresses[treeOwner];
+                        for (uint256 j = 0; j < verifierTokenAddrs.length; j++) {
+                            if (verifierTokenAddrs[j] == planterTokenAddr) {
+                                verifierTokenAddrs[j] = verifierTokenAddrs[verifierTokenAddrs.length - 1];
+                                verifierTokenAddrs.pop();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                emit VerificationRemoved(verificationIds[i], _tokenId, verifier);
+                break;
+            }
+        }
+    }
+
+    function getVerifiedTreesByUser(address verifier) public view returns (Tree[] memory) {
+        // This function retrieves all trees verified by a specific verifier
+
+        uint256[] memory verifiedTokens = s_verifierToTreeTokenIDs[verifier];
+        Tree[] memory verifiedTrees = new Tree[](verifiedTokens.length);
+        for (uint256 i = 0; i < verifiedTokens.length; i++) {
+            uint256 tokenId = verifiedTokens[i];
+            verifiedTrees[i] = s_tokenIDtoTree[tokenId];
+        }
+        return verifiedTrees;
+    }
+
+    function getVerifiedTreesByUserPaginated(address verifier, uint256 offset, uint256 limit)
+        public
+        view
+        returns (Tree[] memory trees, uint256 totalCount)
+    {
+        // Get the total number of trees verified by this verifier
+
+        uint256[] memory verifiedTokens = s_verifierToTreeTokenIDs[verifier];
+        totalCount = verifiedTokens.length;
+        if (offset >= totalCount) {
+            return (new Tree[](0), totalCount);
+        }
+        uint256 end = offset + limit;
+        if (end > totalCount) {
+            end = totalCount;
+        }
+        uint256 resultLength = end - offset;
+        trees = new Tree[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            uint256 tokenId = verifiedTokens[offset + i];
+            trees[i] = s_tokenIDtoTree[tokenId];
+        }
+
+        return (trees, totalCount);
+    }
+
+    function getTreeNftVerifiers(uint256 _tokenId) public view returns (TreeNftVerification[] memory) {
+        // This function retrieves all verifiers for a specific tree
+
+        uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
+        uint256 visibleCount;
+        for (uint256 i = 0; i < verificationIds.length; i++) {
+            if (!s_tokenIDtoTreeNftVerfication[verificationIds[i]].isHidden) {
+                visibleCount++;
+            }
+        }
+        TreeNftVerification[] memory treeNftVerifications = new TreeNftVerification[](visibleCount);
+        uint256 currentIndex;
+        for (uint256 i = 0; i < verificationIds.length; i++) {
+            TreeNftVerification memory verification = s_tokenIDtoTreeNftVerfication[verificationIds[i]];
+            if (!verification.isHidden) {
+                treeNftVerifications[currentIndex] = verification;
+                currentIndex++;
+            }
+        }
+        return treeNftVerifications;
+    }
+
+    function getTreeNftVerifiersPaginated(uint256 _tokenId, uint256 offset, uint256 limit)
+        public
+        view
+        returns (TreeNftVerification[] memory verifications, uint256 totalCount, uint256 visiblecount)
+    {
+        // This function retrieves all verifiers for a specific tree with pagination
+
+        uint256[] storage verificationIds = s_treeTokenIdToVerifications[_tokenId];
+        totalCount = verificationIds.length;
+        uint256 visibleCount = 0;
+        for (uint256 i = 0; i < totalCount; i++) {
+            if (!s_tokenIDtoTreeNftVerfication[verificationIds[i]].isHidden) {
+                visibleCount++;
+            }
+        }
+        if (offset >= visibleCount) {
+            return (new TreeNftVerification[](0), totalCount, visibleCount);
+        }
+        uint256 end = offset + limit;
+        if (end > visibleCount) {
+            end = visibleCount;
+        }
+        uint256 resultLength = end - offset;
+        verifications = new TreeNftVerification[](resultLength);
+        uint256 visibleIndex;
+        uint256 resultIndex;
+        for (uint256 i = 0; i < totalCount && resultIndex < resultLength; i++) {
+            TreeNftVerification memory verification = s_tokenIDtoTreeNftVerfication[verificationIds[i]];
+            if (!verification.isHidden) {
+                if (visibleIndex >= offset && visibleIndex < end) {
+                    verifications[resultIndex] = verification;
+                    resultIndex++;
+                }
+                visibleIndex++;
+            }
+        }
+        return (verifications, totalCount, visibleCount);
     }
 
     function markDead(uint256 tokenId) public {
         // This function marks a tree as dead
 
-        if (!_exists(tokenId)) revert TokenDoesNotExist();
-        if (s_tokenIDtoTree[tokenId].death != type(uint256).max) revert TreeAlreadyDead();
+        if (!_exists(tokenId)) revert InvalidTreeID();
+        if (s_tokenIDtoTree[tokenId].death != type(uint256).max) {
+            revert TreeAlreadyDead();
+        }
         if (ownerOf(tokenId) != msg.sender) revert NotTreeOwner();
+        if (s_tokenIDtoTree[tokenId].planting + minimumTimeToMarkTreeDead >= block.timestamp) {
+            revert MinimumMarkDeadTimeNotReached();
+        }
+
+        legacyToken.mint(msg.sender, 1 * 1e18);
+
         s_tokenIDtoTree[tokenId].death = block.timestamp;
         s_deathCounter++;
     }
 
-    function verify(uint256 tokenId) public {
-        // This function allows a verifier to verify a tree
+    function registerUserProfile(string memory _name, string memory _profilePhoto) public {
+        // This function registers a user
 
-        require(_exists(tokenId), "Token does not exist");
-        if (!s_tokenIDtoUserVerification[tokenId][msg.sender]) {
-            s_tokenIDtoUserVerification[tokenId][msg.sender] = true;
-            s_tokenIDtoVerifiers[tokenId].push(msg.sender);
-            s_verifierToTokenIDs[msg.sender].push(tokenId);
+        if (s_addressToUser[msg.sender].userAddress != address(0)) {
+            revert UserAlreadyRegistered();
         }
+        User memory user = User(msg.sender, _profilePhoto, _name, block.timestamp, 0, 0);
+        s_addressToUser[msg.sender] = user;
+        s_userCounter++;
+    }
+
+    function getUserProfile(address userAddress) public view returns (UserDetails memory userDetails) {
+        // This function returns the details of the user
+
+        if (s_addressToUser[userAddress].userAddress == address(0)) {
+            revert UserNotRegistered();
+        }
+        User memory storedUserDetails = s_addressToUser[userAddress];
+        userDetails.name = storedUserDetails.name;
+        userDetails.dateJoined = storedUserDetails.dateJoined;
+        userDetails.profilePhoto = storedUserDetails.profilePhoto;
+        userDetails.userAddress = storedUserDetails.userAddress;
+        userDetails.reportedSpam = storedUserDetails.reportedSpam;
+        userDetails.verificationsRevoked = storedUserDetails.verificationsRevoked;
+        userDetails.careTokens = careTokenContract.balanceOf(userAddress);
+        userDetails.legacyTokens = legacyToken.balanceOf(userAddress);
+        return userDetails;
+    }
+
+    function getUserVerifierTokenDetails(address userAddress)
+        public
+        view
+        returns (VerificationDetails[] memory verifierTokenDetails)
+    {
+        // This function returns the verifier token address of the user
+
+        TreeNftVerification[] memory userVerifications = s_userToVerifications[userAddress];
+        for (uint256 i = 0; i < userVerifications.length; i++) {
+            PlanterToken planterToken = PlanterToken(userVerifications[i].verifierPlanterTokenAddress);
+            verifierTokenDetails[i] = VerificationDetails({
+                verifier: userVerifications[i].verifier,
+                timestamp: userVerifications[i].timestamp,
+                proofHashes: userVerifications[i].proofHashes,
+                description: userVerifications[i].description,
+                isHidden: userVerifications[i].isHidden,
+                numberOfTrees: planterToken.balanceOf(userAddress),
+                verifierPlanterTokenAddress: userVerifications[i].verifierPlanterTokenAddress
+            });
+        }
+    }
+
+    function updateUserDetails(string memory _name, string memory _profilePhoto) public {
+        // This function enables a user to change his user details
+
+        if (s_addressToUser[msg.sender].userAddress == address(0)) {
+            revert UserNotRegistered();
+        }
+        s_addressToUser[msg.sender].name = _name;
+        s_addressToUser[msg.sender].profilePhoto = _profilePhoto;
     }
 
     function isVerified(uint256 tokenId, address verifier) public view returns (bool) {
@@ -90,204 +480,7 @@ contract TreeNft is ERC721, Ownable {
         return s_tokenIDtoUserVerification[tokenId][verifier];
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        // This function returns the token URI for a given token ID
-
-        require(_exists(tokenId), "Token does not exist");
-        Tree memory tree = s_tokenIDtoTree[tokenId];
-        string memory verifiersList = _getVerifiersString(tokenId);
-
-        string memory json = string(
-            abi.encodePacked(
-                '{"name":"TreeNFT #',
-                _uintToString(tokenId),
-                '", "description":"A Tree NFT for planting a tree", ',
-                '"attributes": [{"trait_type": "Latitude", "value": "',
-                _uintToString(tree.latitude),
-                '"}, {"trait_type": "Longitude", "value": "',
-                _uintToString(tree.longitude),
-                '"}, {"trait_type": "Planting", "value": "',
-                _uintToString(tree.planting),
-                '"}, {"trait_type": "Death", "value": "',
-                _uintToString(tree.death),
-                '"}, {"trait_type": "Verifiers", "value": "',
-                verifiersList,
-                '"}], "image":"',
-                tree.imageUri, // Use custom image URI
-                '"}'
-            )
-        );
-        return string(abi.encodePacked(_baseURI(), Base64.encode(bytes(json))));
-    }
-
-    function getAllNFTs() public view returns (string[] memory) {
-        // This function retrieves all NFTs in the contract
-
-        string[] memory allNFTs = new string[](s_tokenCounter);
-        for (uint256 tokenId = 0; tokenId < s_tokenCounter; tokenId++) {
-            Tree memory tree = s_tokenIDtoTree[tokenId];
-            string memory verifiersList = _getVerifiersString(tokenId);
-
-            string memory nftDetails = string(
-                abi.encodePacked(
-                    '{"tokenId": "',
-                    _uintToString(tokenId),
-                    '", "latitude": "',
-                    _uintToString(tree.latitude),
-                    '", "longitude": "',
-                    _uintToString(tree.longitude),
-                    '", "species": "',
-                    tree.species,
-                    '", "planting": "',
-                    _uintToString(tree.planting),
-                    '", "death": "',
-                    _uintToString(tree.death),
-                    '", "verifiers": "',
-                    verifiersList,
-                    '", "imageUri": "',
-                    tree.imageUri,
-                    '", "tokenURI": "',
-                    tokenURI(tokenId),
-                    '"}'
-                )
-            );
-
-            allNFTs[tokenId] = nftDetails;
-        }
-
-        return allNFTs;
-    }
-
-    function getNFTsByUser(address user) public view returns (string[] memory) {
-        // This function retrieves all NFTs owned by a specific user
-
-        uint256[] memory userNFTs = s_userToNFTs[user];
-        string[] memory nftDetails = new string[](userNFTs.length);
-
-        for (uint256 i = 0; i < userNFTs.length; i++) {
-            uint256 tokenId = userNFTs[i];
-            Tree memory tree = s_tokenIDtoTree[tokenId];
-            string memory verifiersList = _getVerifiersString(tokenId);
-
-            nftDetails[i] = string(
-                abi.encodePacked(
-                    '{"tokenId": "',
-                    _uintToString(tokenId),
-                    '", "latitude": "',
-                    _uintToString(tree.latitude),
-                    '", "longitude": "',
-                    _uintToString(tree.longitude),
-                    '", "species": "',
-                    tree.species,
-                    '", "planting": "',
-                    _uintToString(tree.planting),
-                    '", "death": "',
-                    _uintToString(tree.death),
-                    '", "verifiers": "',
-                    verifiersList,
-                    '", "imageUri": "',
-                    tree.imageUri,
-                    '", "tokenURI": "',
-                    tokenURI(tokenId),
-                    '"}'
-                )
-            );
-        }
-
-        return nftDetails;
-    }
-
-    function getVerifiedTreesByUser(address verifier) public view returns (string[] memory) {
-        // This function retrieves all trees verified by a specific verifier
-
-        uint256[] memory verifiedTokens = s_verifierToTokenIDs[verifier];
-        string[] memory treeDetails = new string[](verifiedTokens.length);
-
-        for (uint256 i = 0; i < verifiedTokens.length; i++) {
-            uint256 tokenId = verifiedTokens[i];
-            Tree memory tree = s_tokenIDtoTree[tokenId];
-
-            // Format the tree information similar to other view functions
-            treeDetails[i] = string(
-                abi.encodePacked(
-                    '{"tokenId": "',
-                    _uintToString(tokenId),
-                    '", "latitude": "',
-                    _uintToString(tree.latitude),
-                    '", "longitude": "',
-                    _uintToString(tree.longitude),
-                    '", "species": "',
-                    tree.species,
-                    '", "planting": "',
-                    _uintToString(tree.planting),
-                    '", "death": "',
-                    _uintToString(tree.death),
-                    '", "imageUri": "',
-                    tree.imageUri,
-                    '"}'
-                )
-            );
-        }
-
-        return treeDetails;
-    }
-
-    function _baseURI() internal pure override returns (string memory) {
-        // This function returns the base URI for the token metadata
-
-        return "data:application/json;base64,";
-    }
-
-    function _getVerifiersString(uint256 tokenId) private view returns (string memory) {
-        // This function retrieves the verifiers for a given token ID
-
-        address[] memory verifiers = s_tokenIDtoVerifiers[tokenId];
-        uint256 length = verifiers.length;
-
-        if (length == 0) {
-            return "None";
-        }
-
-        string memory verifiersList = _addressToString(verifiers[0]);
-
-        for (uint256 i = 1; i < length; i++) {
-            verifiersList = string(abi.encodePacked(verifiersList, ", ", _addressToString(verifiers[i])));
-        }
-
-        return verifiersList;
-    }
-
-    function _uintToString(uint256 value) private pure returns (string memory) {
-        // This function converts a uint256 to a string
-
-        if (value == 0) return "0";
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits--;
-            buffer[digits] = bytes1(uint8(48 + (value % 10)));
-            value /= 10;
-        }
-        return string(buffer);
-    }
-
-    function _addressToString(address addr) private pure returns (string memory) {
-        // This function converts an address to a string
-
-        bytes32 value = bytes32(uint256(uint160(addr)));
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(42);
-        str[0] = "0";
-        str[1] = "x";
-        for (uint256 i = 0; i < 20; i++) {
-            str[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
-            str[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
-        }
-        return string(str);
+    function _exists(uint256 tokenId) internal view returns (bool) {
+        return tokenId < s_treeTokenCounter && tokenId >= 0;
     }
 }
